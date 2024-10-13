@@ -10,11 +10,12 @@ install.packages("Rnhanesdata")
 
 # Import data
 ```{r,warning=FALSE}
-library(tidyverse)   # For data manipulation and visualization
-library(haven)       # For reading SAS files (.XPT)
-library(NHANES)      # Simplifies accessing NHANES data (optional)
-library(dplyr)  # for inner_join()
-library(purrr)  # for reduce()
+library(tidyverse)   
+library(haven)      
+library(NHANES)     
+library(dplyr)  
+library(purrr)
+library(lubridate)
 
 getwd()
 setwd("./data/2020")
@@ -38,14 +39,20 @@ dat_raw <- left_join(SLQ, temp)
 # DMDEDUC2(education level 20+)
 # DMDMARTZ - Marital status
 ```
+# scanning raw data
+```{r}
+str(dat_raw) 
+summary(dat_raw) 
+```
+
 
 # Data cleaning
 ```{r}
-#remove all lines with NA
+# remove all lines with NA
 dat_raw[dat_raw == ""] <- NA
 dat_clean <- drop_na(dat_raw)
 
-#rename cols
+# rename cols
 new_colnames <-  c(
   "ID",      # SEQN;Respondent_sequence_number
   "sleep_time_weekdays",       # SLQ300;Usual_sleep_time_weekdays
@@ -61,19 +68,28 @@ new_colnames <-  c(
   "BMI",                 # BMXBMI;Body_Mass_Index
   "alcohol",         # ALQ121;How_often_drink_alcohol
   "gender",                          # RIAGENDR;Gender
-  "age",                # RIDAGEYR;Age_at_screening
   "Race_Hispanic_origin",            # RIDRETH1;Race_Hispanic_origin
+  "age",                # RIDAGEYR;Age_at_screening
   "Family_income_to_poverty_ratio",  # INDFMPIR;Family_income_to_poverty_ratio
-  "K",                # LBXSLSI;Potassium_mmol_L
   "Na",                   # LBXSNASI;Sodium_mmol_L
-  "Cl",                 # LBXSCLSI;Chloride_mmol_L
+  "K",                # LBXSLSI;Potassium_mmol_L
   "Ca",            # LBDSCASI;Total_Calcium_mmol_L
+  "Cl",                 # LBXSCLSI;Chloride_mmol_L
   "sedentary_activity"       # PAD680;Minutes_sedentary_activity
 )
 colnames(dat_clean) <- new_colnames
 
-#
+# correct data type
+dat_cleaned <- dat_clean |>
+  mutate(across(c(sleep_time_weekdays,wake_time_weekdays,sleep_time_weekends,wake_time_weekends), hm)) |>
+  mutate(across(c(ID,frq_snore,frq_snort_or_stop_breathing,sleep_trouble,overly_sleepy,alcohol,gender,Race_Hispanic_origin),as.factor)) |>
+  mutate(across(c(,),as.numeric))
+
 ```
 
-
+# scanning cleaned data
+```{r}
+str(dat_cleaned) 
+summary(dat_cleaned) 
+```
 
