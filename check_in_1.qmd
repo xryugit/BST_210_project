@@ -80,7 +80,9 @@ Create boxplots to examine the initial patterns in sleep quality measurements fo
 
 Logistic regression model: We will model the diagnosis of sleep disorders against identified covariates
 
-Linear regression model: We will model sleep quality metrics against identified covariates \### Examine potential confounding and effect modification
+Linear regression model: We will model sleep quality metrics against identified covariates
+
+### Examine potential confounding and effect modification
 
 Confounders: we will check the classical and operational definition for several potential confounders, such as age, sex, etc.
 
@@ -102,7 +104,7 @@ Model complexity in terms of interpretability will also be determined in a subje
 
 We will conduct analyses (e.g. residual analysis for linear models) to check whether the underlying assumptions of logistic and linear models are satisfied.
 
-We will also perform sensitivity analysis (e.g. Cook’s distance, DFFITS, DFBETAS) to closely examine the leverage and outlying-ness of highly influential data points. Comparison of models with and without these influential points enable us to decide whether or not we can remove these data points.
+We will also perform sensitivity analysis (e.g. Cook’s distance, DFFITS, DFBETAS) to closely examine the leverage and outlyingness of highly influential data points. Comparison of models with and without these influential points enable us to decide whether or not we can remove these data points.
 
 ## Model Interpretation
 
