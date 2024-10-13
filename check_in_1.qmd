@@ -9,7 +9,7 @@ install.packages("Rnhanesdata")
 ```
 
 # Import data
-```{r}
+```{r,warning=FALSE}
 library(tidyverse)   # For data manipulation and visualization
 library(haven)       # For reading SAS files (.XPT)
 library(NHANES)      # Simplifies accessing NHANES data (optional)
@@ -30,14 +30,50 @@ SLQ <- read_xpt("P_SLQ.XPT")
 TCHOL <- read_xpt("P_TCHOL.XPT")
 
 datasets <- list(ALQ, BIOPRO, BMX, BPXO, DEMO,  PAQ, SLQ, TCHOL)
-
-test <- reduce(datasets, inner_join, by = "SEQN")  # Assuming 'SEQN' is the common identifier
+test <- reduce(datasets, inner_join, by = "SEQN")  
 
 temp <- select(test, SEQN , BMXBMI, ALQ121, RIAGENDR, RIDRETH1, RIDAGEYR, INDFMPIR, LBXSNASI, LBXSKSI, LBDSCASI, LBXSCLSI, PAD680 )
-dat <- left_join(SLQ, temp )
+dat_raw <- left_join(SLQ, temp)
 
-dat_clean <- drop_na(dat)
 # DMDEDUC2(education level 20+)
 # DMDMARTZ - Marital status
 ```
+
+# Data cleaning
+```{r}
+#remove all lines with NA
+dat_raw[dat_raw == ""] <- NA
+dat_clean <- drop_na(dat_raw)
+
+#rename cols
+new_colnames <-  c(
+  "ID",      # SEQN;Respondent_sequence_number
+  "sleep_time_weekdays",       # SLQ300;Usual_sleep_time_weekdays
+  "wake_time_weekdays",        # SLQ310;Usual_wake_time_weekdays
+  "sleep_hours_weekdays",            # SLD012;Sleep_hours_weekdays
+  "sleep_time_weekends",       # SLQ320;Usual_sleep_time_weekends
+  "wake_time_weekends",        # SLQ330;Usual_wake_time_weekends
+  "sleep_hours_weekends",            # SLD013;Sleep_hours_weekends
+  "frq_snore",                 # SLQ030;How_often_snore
+  "frq_snort_or_stop_breathing",# SLQ040;How_often_snort_or_stop_breathing
+  "sleep_trouble",  # SLQ050;Ever_told_doctor_sleep_trouble
+  "overly_sleepy",          # SLQ120;Feel_overly_sleepy_day
+  "BMI",                 # BMXBMI;Body_Mass_Index
+  "alcohol",         # ALQ121;How_often_drink_alcohol
+  "gender",                          # RIAGENDR;Gender
+  "age",                # RIDAGEYR;Age_at_screening
+  "Race_Hispanic_origin",            # RIDRETH1;Race_Hispanic_origin
+  "Family_income_to_poverty_ratio",  # INDFMPIR;Family_income_to_poverty_ratio
+  "K",                # LBXSLSI;Potassium_mmol_L
+  "Na",                   # LBXSNASI;Sodium_mmol_L
+  "Cl",                 # LBXSCLSI;Chloride_mmol_L
+  "Ca",            # LBDSCASI;Total_Calcium_mmol_L
+  "sedentary_activity"       # PAD680;Minutes_sedentary_activity
+)
+colnames(dat_clean) <- new_colnames
+
+#
+```
+
+
 
