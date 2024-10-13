@@ -2,6 +2,7 @@
 title: "check_in_1"
 format: pdf
 editor: visual
+author: Yuan Tian; Yinjie Wu; Xinran Yu
 execute:
   echo: false
 ---
@@ -145,7 +146,7 @@ boxplot(dat_clean$sleep_hours_avg~dat_clean$Race_Hispanic_origin,main = "Boxplot
 # Correlations
 
 ```{r}
-par(mfrow = c(2,2))
+par(mfrow = c(1,2))
 scatter.smooth(dat_cleaned$BMI,dat_cleaned$sleep_hours_avg,col = "light blue")
 scatter.smooth(dat_cleaned$age,dat_cleaned$sleep_hours_avg,col = "light blue")
 scatter.smooth(dat_cleaned$Family_income_to_poverty_ratio,dat_cleaned$sleep_hours_avg,col = "light blue")
