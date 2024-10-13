@@ -88,45 +88,64 @@ dat_clean <- dat_raw |>
 
 # scanning cleaned data
 ```{r}
-str(dat_cleaned) 
-summary(dat_cleaned) 
+str(dat_clean) 
+summary(dat_clean) 
 ```
-# Histogram of outcome
 
+# Histogram of outcome
 ```{r}
-hist(dat_cleaned$sleep_trouble)
+par(mfrow = c(1,2))
+barplot(table(dat_clean$sleep_trouble), xlab = "1 = Yes; 2 = No", main = "Barplot of sleep_trouble", ylab = "Frequency")
+hist(dat_clean$sleep_hours_avg, main = "Histogram of avg sleep hours",breaks = 30, xlab = "avg sleep hours")
 ```
 
 # Histogram of continuous variables X
+```{r}
+par(mfrow = c(1,2))
+hist(dat_clean$BMI,main = "BMI",xlab = "BMI")
+hist(dat_clean$age,main = "age", xlab = "age")
+```
+```{r}
+hist(dat_clean$Family_income_to_poverty_ratio,main = "Family_income_to_poverty_ratio", xlab = "Family_income_to_poverty_ratio",breaks = 70)
+```
+```{r}
+par(mfrow = c(1,2))
+hist(dat_clean$Na,main = "Na",xlab = "Na(mmol/L)",breaks = 30)
+hist(dat_clean$K,main = "K", xlab = "K(mmol/L)",breaks = 30)
+```
+```{r}
+par(mfrow = c(1,2))
+hist(dat_clean$Ca,main = "Ca",xlab = "Ca(mmol/L)",breaks = 30)
+hist(dat_clean$Cl,main = "Cl", xlab = "Cl(mmol/L)",,breaks = 30)
+```
+```{r}
+hist(dat_clean$sedentary_activity,main = "sedentary_activity",xlab = "sedentary_activity(mins)",breaks = 70)
+```
+Obviously, 9000 minutes is more than the possible range of a day (1440 minutes). Thus these high leverage points are errors. It's better to remove them.
+```{r}
+dat_cleaned <- dat_clean |>
+  filter(sedentary_activity < 9000)
+hist(dat_cleaned$sedentary_activity,main = "sedentary_activity replot",xlab = "sedentary_activity(mins)",breaks = 10)
+```
 
-```{r}
-par(mfrow = c(1,2))
-hist(dat_cleaned$BMI,main = "BMI",xlab = "BMI")
-hist(dat_cleaned$age,main = "age", xlab = "age")
-```
-```{r}
-hist(dat_cleaned$Family_income_to_poverty_ratio,main = "Family_income_to_poverty_ratio", xlab = "Family_income_to_poverty_ratio",breaks = 70)
-```
-```{r}
-par(mfrow = c(1,2))
-hist(dat_cleaned$Na,main = "Na",xlab = "Na(mmol/L)",breaks = 30)
-hist(dat_cleaned$K,main = "K", xlab = "K(mmol/L)",breaks = 30)
-```
-```{r}
-par(mfrow = c(1,2))
-hist(dat_cleaned$Ca,main = "Ca",xlab = "Ca(mmol/L)",breaks = 30)
-hist(dat_cleaned$Cl,main = "Cl", xlab = "Cl(mmol/L)",,breaks = 30)
-```
-```{r}
-hist(dat_cleaned$sedentary_activity,main = "sedentary_activity",xlab = "sedentary_activity(mins)",breaks = 70)
-```
+
+
 # Boxplot
 ```{r}
-boxplot(dat_cleaned$sleep_hours_avg~dat_cleaned$alcohol)
+boxplot(dat_clean$sleep_hours_avg~dat_clean$alcohol, main = "Boxplot of avg sleep hours vs alcohol",xlab = "How often drink alcohol")
 ```
+```{r}
+boxplot(dat_clean$sleep_hours_avg~dat_clean$gender,main = "Boxplot of avg sleep hours vs gender",xlab = "1 = Male; 2 = Female")
+```
+```{r}
+boxplot(dat_clean$sleep_hours_avg~dat_clean$Race_Hispanic_origin,main = "Boxplot of avg sleep hours vs races",xlab = "1 = Mexican American; 2 = Other Hispanic; 3 = White; 4 = Black; 5 = Other Race")
+```
+# Correlations
 
 ```{r}
-table_cat <- table(dat_cleaned$sleep_trouble, dat_cleaned$)
-chisq.test(table_cat)
+pairs(dat_cleaned$sleep_hours_avg ~ dat_cleaned$BMI + dat_cleaned$age + dat_cleaned$Family_income_to_poverty_ratio + dat_cleaned$sedentary_activity)
+```
+```{r}
+pairs(dat_cleaned$sleep_hours_avg ~ dat_cleaned$Na + dat_cleaned$K + dat_cleaned$Ca + dat_cleaned$Cl)
 ```
 
