@@ -2,6 +2,8 @@
 title: "check_in_1"
 format: pdf
 editor: visual
+execute:
+  echo: false
 ---
 ```
 install.packages(c("tidyverse", "NHANES", "foreign", "haven", "survey", "mice"))
@@ -162,3 +164,7 @@ pairs(dat_cleaned$sleep_hours_avg ~ dat_cleaned$BMI + dat_cleaned$age + dat_clea
 pairs(dat_cleaned$sleep_hours_avg ~ dat_cleaned$Na + dat_cleaned$K + dat_cleaned$Ca + dat_cleaned$Cl,col = "light blue")
 ```
 
+# Code Appendix
+
+```{r, ref.label=knitr::all_labels(),echo=TRUE,eval=FALSE}
+```
