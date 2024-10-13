@@ -48,10 +48,6 @@ summary(dat_raw)
 
 # Data cleaning
 ```{r}
-# remove all lines with NA
-dat_raw[dat_raw == ""] <- NA
-dat_clean <- drop_na(dat_raw)
-
 # rename cols
 new_colnames <-  c(
   "ID",      # SEQN;Respondent_sequence_number
@@ -77,13 +73,21 @@ new_colnames <-  c(
   "Cl",                 # LBXSCLSI;Chloride_mmol_L
   "sedentary_activity"       # PAD680;Minutes_sedentary_activity
 )
-colnames(dat_clean) <- new_colnames
+colnames(dat_raw) <- new_colnames
+# remove all lines with NA
+dat_raw[dat_raw == ""] <- NA
+dat_clean <- dat_raw |>
+  drop_na() |>
+   filter(alcohol != 77 & frq_snore != 7 & frq_snore != 9 & frq_snort_or_stop_breathing != 7 & frq_snort_or_stop_breathing != 9 & sleep_trouble != 9 & overly_sleepy != 9)
+ 
+
+
 
 # correct data type
 dat_cleaned <- dat_clean |>
   mutate(across(c(sleep_time_weekdays,wake_time_weekdays,sleep_time_weekends,wake_time_weekends), hm)) |>
   mutate(across(c(ID,frq_snore,frq_snort_or_stop_breathing,sleep_trouble,overly_sleepy,alcohol,gender,Race_Hispanic_origin),as.factor)) |>
-  mutate(across(c(,),as.numeric))
+  mutate(across(c(,),as.numeric)) 
 
 ```
 
@@ -91,5 +95,30 @@ dat_cleaned <- dat_clean |>
 ```{r}
 str(dat_cleaned) 
 summary(dat_cleaned) 
+```
+
+# Histogram of cotinuous variables
+
+```{r}
+par(mfrow = c(1,2))
+hist(dat_cleaned$BMI,main = "BMI",xlab = "BMI")
+hist(dat_cleaned$age,main = "age", xlab = "age")
+```
+```{r}
+hist(dat_cleaned$Family_income_to_poverty_ratio,main = "Family_income_to_poverty_ratio", xlab = "Family_income_to_poverty_ratio")
+```
+```{r}
+par(mfrow = c(1,2))
+hist(dat_cleaned$Na,main = "Na",xlab = "Na(mmol/L)")
+hist(dat_cleaned$K,main = "K", xlab = "K(mmol/L)")
+```
+```{r}
+par(mfrow = c(1,2))
+hist(dat_cleaned$Ca,main = "Ca",xlab = "Ca(mmol/L)")
+hist(dat_cleaned$Cl,main = "Cl", xlab = "Cl(mmol/L)")
+```
+```{r}
+hist(dat_cleaned$sedentary_activity,main = "sedentary_activity",xlab = "sedentary_activity(mins)")
+
 ```
 
