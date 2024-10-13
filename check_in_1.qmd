@@ -16,7 +16,9 @@ execute:
 
 **Xinran Yu**
 
-![](images/WechatIMG1157.png){fig-align="center"}
+No member of this group is using these data or same/similar questions in any other course or course project, at HSPH.
+
+![](images/image.png)
 
 # Q1 General area/domain/subject area
 
@@ -60,11 +62,11 @@ We imported the NHANES raw data relevant to sleep disorders and potentially asso
 
 Generate summary statistics again to gain an initial understanding of the distribution of outcomes and predictor variables.
 
-### Visualization of outcome variables 
+### Visualization of outcome variables
 
 Create a barplot to visualize the distribution of the categorical outcome variable (sleep disorder) and a histogram to visualize the distribution of the continuous outcome variable (sleep duration).
 
-### Visualization of predictor variables 
+### Visualization of predictor variables
 
 Create histograms to examine the distribution of continuous predictor variables (BMI, blood pressure, concentration of electrolytes in blood, sedentary activity, etc) and barplots to examine the distribution of categorical predictor variables (alcohol use, etc). Identify possible skewness.
 
@@ -76,28 +78,27 @@ Create boxplots to examine the initial patterns in sleep quality measurements fo
 
 ### Identify regression models
 
-Logistic regression model: We will model the diagnosis of sleep disorders against identified covariates 
+Logistic regression model: We will model the diagnosis of sleep disorders against identified covariates
 
-Linear regression model: We will model sleep quality metrics against identified covariates 
-### Examine potential confounding and effect modification 
+Linear regression model: We will model sleep quality metrics against identified covariates \### Examine potential confounding and effect modification
 
-Confounders: we will check the classical and operational definition for several potential confounders, such as age, sex, etc. 
+Confounders: we will check the classical and operational definition for several potential confounders, such as age, sex, etc.
 
-Effect modifiers: we will test possible interactions that exist by comparing the statistical results produced with and without interaction terms and the significance of interaction terms. 
+Effect modifiers: we will test possible interactions that exist by comparing the statistical results produced with and without interaction terms and the significance of interaction terms.
 
-### Model selection 
+### Model selection
 
 For association tasks:
 
-We will use Elastic Net for variable selection coefficient estimation for our logistic model and linear regression model. This process allows us to determine which variables to be kept and which statistically insignificant variables can be removed from our models. We will experiment on hyperparameter alpha to search for lower AIC values. 
+We will use Elastic Net for variable selection coefficient estimation for our logistic model and linear regression model. This process allows us to determine which variables to be kept and which statistically insignificant variables can be removed from our models. We will experiment on hyperparameter alpha to search for lower AIC values.
 
 We will also search for lower AIC values with stepwise, forward, backward selection for model comparison.
 
-Automatic methods like GAM and automatic spline function will be performed as a reference of AIC/BIC values for comparison. 
+Automatic methods like GAM and automatic spline function will be performed as a reference of AIC/BIC values for comparison.
 
 Model complexity in terms of interpretability will also be determined in a subjective manner.
 
-### Model diagnostics 
+### Model diagnostics
 
 We will conduct analyses (e.g. residual analysis for linear models) to check whether the underlying assumptions of logistic and linear models are satisfied.
 
@@ -109,7 +110,7 @@ Using the statistically significant covariates identified through the methods di
 
 ## Investigation of Secondary Questions
 
-We will apply the final form of our regression models, using the same covariates, to analyze datasets from previous years (e.g., NHANES data from 10 years ago). We will compare the coefficients of the two models and interpret the differences. Then we may also explore factors that are less significant now but could be more impactful ten years ago. 
+We will apply the final form of our regression models, using the same covariates, to analyze datasets from previous years (e.g., NHANES data from 10 years ago). We will compare the coefficients of the two models and interpret the differences. Then we may also explore factors that are less significant now but could be more impactful ten years ago.
 
 Based on the full model, we may be able to explain the effect of subset of covariates such as concentrations of ions on sleep duration and sleep disorder. We may consider doing further explanation using other methods.
 
@@ -117,7 +118,7 @@ We will also assess how effective our interpretable model can predict whether a 
 
 ## Discussion of Model Results and Key Findings
 
-We will incorporate scientific knowledge (based on advice from experts in epidemiology and biomedical science) to assess our final fitted models within the context of sleep health. 
+We will incorporate scientific knowledge (based on advice from experts in epidemiology and biomedical science) to assess our final fitted models within the context of sleep health.
 
 We will also discuss the limitations to our current models and directions for future works
 
@@ -316,8 +317,17 @@ pairs(dat_cleaned$sleep_hours_avg ~ dat_cleaned$Na + dat_cleaned$K + dat_cleaned
 
 # Q11
 
-Project Attestation:  No member of this group is using these data or same/similar questions in any other course or course project, at HSPH.  By listing your name as a group member on your project, and submitting this assignment, you are attesting to this statement above.  Groups must include this attestation here under Question 11 in order to receive credit for HW4!
+**Group 26**
 
+**Academic Grasshoppers**
+
+**Yinjie Wu**
+
+**Yuan Tian**
+
+**Xinran Yu**
+
+Project Attestation: No member of this group is using these data or same/similar questions in any other course or course project, at HSPH. By listing your name as a group member on your project, and submitting this assignment, you are attesting to this statement above. Groups must include this attestation here under Question 11 in order to receive credit for HW4!
 
 # Code Appendix
 
