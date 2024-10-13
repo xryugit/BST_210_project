@@ -2,16 +2,152 @@
 title: "check_in_1"
 format: pdf
 editor: visual
-author: Yuan Tian; Yinjie Wu; Xinran Yu
 execute:
   echo: false
 ---
-```
+
+**Group 26**
+
+**Academic Grasshoppers**
+
+**Yinjie Wu**
+
+**Yuan Tian**
+
+**Xinran Yu**
+
+![](images/WechatIMG1157.png){fig-align="center"}
+
+# Q1 General area/domain/subject area
+
+Sleep disorders have become a common issue for many people today, severely impacting the mental functioning and quality of life. This project explores the potential biological and behavioral factors associated with sleep disorders.
+
+# Q2 Dataset and source (describe clearly in several sentences)
+
+Sample size: There are 15560 individuals in the dataset, 8965 individuals with selected covariates measured, and 5394 individuals with no missing values for all covariates and outcomes. The sample size is not final as we may introduce or remove covariates.
+
+We are also considering using past year’s data to see if the association changes throughout the years. For example, are weights for each feature had a similar pattern 10 years ago or not, where the sample size could vary slightly depending on the year.
+
+Number of covariates: We are currently including 11 potential covariates, we could introduce more out of interest, or remove irrelevant covariates. Majority of the covariates follow iid.
+
+Source: We are using NHANES 2017-March 2020 Pre-pandemicLinks to an external site. (The National Health and Nutrition Examination Survey program from CDCLinks to an external site.), which assesses the health and nutritional status of adults and children in the United States from 2017 to March 2020. This project has taken a number of health and lifestyle measurements on a specific group of people. Each set of measurements are included in separate files, but all files contain the subject's ID. The ID of each person in this project is unique and constant across all measurements. Therefore, we can merge the data in the measurements we are interested in based on these IDs. If time permits, a similar dataset from the past year or the most recent dataset may be used for comparison. The 2023 version updated in September 2024 contains much less information.
+
+# Q3 Primary questions
+
+The primary question of this project is to investigate the association between sleep disorders/duration and a range of biological and behavioral factors. Some factors we are going to explore include BMI, blood pressure, alcohol use, physical activity, and several biomarkers. We are going to examine whether these variables are associated with the occurrence of sleep disorders or sleep duration. If so, we want to determine which factors are most strongly associated with sleep disorders and/or sleep duration.
+
+# Q4 Secondary questions
+
+How is the concentration of ions associated with sleep disorders or sleep duration, such as sodium, calcium, and potassium? How about other compounds or measurements such as blood pressure? Do coefficients of covariates in our models hold compared to the dataset from 10 years ago or after the pandemic? Can we predict whether a person has a sleep disorder or his/her sleep duration based on his/her measurements? Other questions we may ask are: Is sleep time associated with those factors? Is the difference between workday and weekend sleep time associated with any of those factors? Are specific sleeping conditions associated with any of those factors? What about the association between sleep disorder and other diseases?
+
+# Q5 Outcome(s)/endpoint(s)
+
+The primary outcome includes self-reported ever told doctors had trouble sleeping (questionnaire), which is a binary outcome with 1(Yes) and 2(No). We will also examine closely related measures such as sleep duration and sleep time and how they are associated with the predictor variables. These measures are continuous as reported by the study participants.
+
+Depending on the time, we may look into categorical variables for specific sleep disorder conditions, such as snore or snort.
+
+# Q6 Draft Statistical Analysis Plan
+
+Our project is divided into the following steps for data cleaning and subsequent analysis and interpretation.
+
+## Data Cleaning and Preprocessing
+
+NHNAES data are classified into several categories based on the type of data collected from study participants, including demographics data, dietary data, examination data, laboratory data, and questionnaire data. Each category is further divided into multiple sections focusing on different measurements.
+
+We imported the NHANES raw data relevant to sleep disorders and potentially associated risk factors, including sleep disorders and health measurements, standard biochemistry profile, physical activity data, total nutrient intake profile, demographic data, and other laboratory data. NHANES raw data from the selected sections will be combined based on the individual-specific ID to generate a profile containing all the information needed for subsequent analysis. Generate summaries of raw data to detect possible missing values, wrong data types. Then we will remove all rows with NAs and change date types according to the summaries. We are considering imputing for some miss values and unrealistic errors, through averaging, regressing, or KNN.
+
+## Exploratory Data Analysis
+
+Generate summary statistics again to gain an initial understanding of the distribution of outcomes and predictor variables.
+
+### Visualization of outcome variables 
+
+Create a barplot to visualize the distribution of the categorical outcome variable (sleep disorder) and a histogram to visualize the distribution of the continuous outcome variable (sleep duration).
+
+### Visualization of predictor variables 
+
+Create histograms to examine the distribution of continuous predictor variables (BMI, blood pressure, concentration of electrolytes in blood, sedentary activity, etc) and barplots to examine the distribution of categorical predictor variables (alcohol use, etc). Identify possible skewness.
+
+Create boxplots to examine the initial patterns in sleep quality measurements for each covariate. Create a matrix of scatterplots and scatter plots with a loess curve for each covariates to check multicollinearity and possible important covariates.
+
+## Model Development and Selection
+
+### Assess multicollinearity among covariates using VIF
+
+### Identify regression models
+
+Logistic regression model: We will model the diagnosis of sleep disorders against identified covariates 
+
+Linear regression model: We will model sleep quality metrics against identified covariates 
+### Examine potential confounding and effect modification 
+
+Confounders: we will check the classical and operational definition for several potential confounders, such as age, sex, etc. 
+
+Effect modifiers: we will test possible interactions that exist by comparing the statistical results produced with and without interaction terms and the significance of interaction terms. 
+
+### Model selection 
+
+For association tasks:
+
+We will use Elastic Net for variable selection coefficient estimation for our logistic model and linear regression model. This process allows us to determine which variables to be kept and which statistically insignificant variables can be removed from our models. We will experiment on hyperparameter alpha to search for lower AIC values. 
+
+We will also search for lower AIC values with stepwise, forward, backward selection for model comparison.
+
+Automatic methods like GAM and automatic spline function will be performed as a reference of AIC/BIC values for comparison. 
+
+Model complexity in terms of interpretability will also be determined in a subjective manner.
+
+### Model diagnostics 
+
+We will conduct analyses (e.g. residual analysis for linear models) to check whether the underlying assumptions of logistic and linear models are satisfied.
+
+We will also perform sensitivity analysis (e.g. Cook’s distance, DFFITS, DFBETAS) to closely examine the leverage and outlying-ness of highly influential data points. Comparison of models with and without these influential points enable us to decide whether or not we can remove these data points.
+
+## Model Interpretation
+
+Using the statistically significant covariates identified through the methods discussed above, we will explain how these variables are associated with sleep disorders and sleep durations based on our results.
+
+## Investigation of Secondary Questions
+
+We will apply the final form of our regression models, using the same covariates, to analyze datasets from previous years (e.g., NHANES data from 10 years ago). We will compare the coefficients of the two models and interpret the differences. Then we may also explore factors that are less significant now but could be more impactful ten years ago. 
+
+Based on the full model, we may be able to explain the effect of subset of covariates such as concentrations of ions on sleep duration and sleep disorder. We may consider doing further explanation using other methods.
+
+We will also assess how effective our interpretable model can predict whether a person has sleep disorders based on the set of measurements included as covariates, by comparing to full, complicated regression models, and compared to non regression models. Performance metrics may include accuracy, R\^2, AUC, and/or etc.. for predictive tasks.
+
+## Discussion of Model Results and Key Findings
+
+We will incorporate scientific knowledge (based on advice from experts in epidemiology and biomedical science) to assess our final fitted models within the context of sleep health. 
+
+We will also discuss the limitations to our current models and directions for future works
+
+# Q7 Biggest challenges foreseen
+
+Since sleep disorders are a group of mental disorders characterized by a diverse range of symptoms and abnormalities, it might be hard for us to reasonably explain some covariates.
+
+Since there are many covariates, the confounding effects and interaction effects between them will be complex, which will be a challenge.
+
+Each covariate and outcome is from a different file, and individuals may have incomplete tests. Adding covariates reduces sample size unless missing/error values are imputed.
+
+Some variables come from questionnaires, like self-reported trouble sleeping, which often include unmeasurable errors.
+
+# Q8 Domain expertise sought (who?)
+
+We might contact Dr. Murray A. Mittleman and seek help on theoretical concepts about epidemiological study design and analysis. We might also consult with Dr. Immaculata De Vivo for assistance on the analysis of biological variables and the possible physiological mechanisms underlying their effects on sleep disorder and duration.
+
+# Q9 What software package(s) will you use to complete this project?
+
+Currently, we all plan to use R.
+
+# Q10 Initial round of exploratory analyses
+
+```         
 install.packages(c("tidyverse", "NHANES", "foreign", "haven", "survey", "mice"))
 install.packages("Rnhanesdata")
 ```
 
-# Import data
+## Import data
+
 ```{r,warning=FALSE}
 library(tidyverse)   
 library(haven)      
@@ -42,14 +178,16 @@ dat_raw <- left_join(SLQ, temp)
 # DMDEDUC2(education level 20+)
 # DMDMARTZ - Marital status
 ```
-# scanning raw data
+
+## scanning raw data
+
 ```{r}
 str(dat_raw) 
 summary(dat_raw) 
 ```
 
+## Data cleaning
 
-# Data cleaning
 ```{r}
 # rename cols
 new_colnames <-  c(
@@ -89,61 +227,72 @@ dat_clean <- dat_raw |>
 
 ```
 
-# scanning cleaned data
+## scanning cleaned data
+
 ```{r}
 str(dat_clean) 
 summary(dat_clean) 
 ```
 
-# Histogram of outcome
+## Histogram and barplot of outcome
+
 ```{r}
 par(mfrow = c(1,2))
 barplot(table(dat_clean$sleep_trouble), xlab = "1 = Yes; 2 = No", main = "Barplot of sleep_trouble", ylab = "Frequency")
 hist(dat_clean$sleep_hours_avg, main = "Histogram of avg sleep hours",breaks = 30, xlab = "avg sleep hours")
 ```
 
-# Histogram of continuous variables X
+## Histogram of continuous variables X
+
 ```{r}
 par(mfrow = c(1,2))
 hist(dat_clean$BMI,main = "BMI",xlab = "BMI")
 hist(dat_clean$age,main = "age", xlab = "age")
 ```
+
 ```{r}
 hist(dat_clean$Family_income_to_poverty_ratio,main = "Family_income_to_poverty_ratio", xlab = "Family_income_to_poverty_ratio",breaks = 70)
 ```
+
 ```{r}
 par(mfrow = c(1,2))
 hist(dat_clean$Na,main = "Na",xlab = "Na(mmol/L)",breaks = 30)
 hist(dat_clean$K,main = "K", xlab = "K(mmol/L)",breaks = 30)
 ```
+
 ```{r}
 par(mfrow = c(1,2))
 hist(dat_clean$Ca,main = "Ca",xlab = "Ca(mmol/L)",breaks = 30)
 hist(dat_clean$Cl,main = "Cl", xlab = "Cl(mmol/L)",,breaks = 30)
 ```
+
 ```{r}
 hist(dat_clean$sedentary_activity,main = "sedentary_activity",xlab = "sedentary_activity(mins)",breaks = 70)
 ```
+
 Obviously, 9000 minutes is more than the possible range of a day (1440 minutes). Thus these high leverage points are errors. It's better to remove them.
+
 ```{r}
 dat_cleaned <- dat_clean |>
   filter(sedentary_activity < 9000)
 hist(dat_cleaned$sedentary_activity,main = "sedentary_activity replot",xlab = "sedentary_activity(mins)",breaks = 10)
 ```
 
+## Boxplot
 
-
-# Boxplot
 ```{r}
 boxplot(dat_clean$sleep_hours_avg~dat_clean$alcohol, main = "Boxplot of avg sleep hours vs alcohol",xlab = "How often drink alcohol")
 ```
+
 ```{r}
 boxplot(dat_clean$sleep_hours_avg~dat_clean$gender,main = "Boxplot of avg sleep hours vs gender",xlab = "1 = Male; 2 = Female")
 ```
+
 ```{r}
 boxplot(dat_clean$sleep_hours_avg~dat_clean$Race_Hispanic_origin,main = "Boxplot of avg sleep hours vs races",xlab = "1 = Mexican American; 2 = Other Hispanic; 3 = White; 4 = Black; 5 = Other Race")
 ```
-# Correlations
+
+## Correlations
 
 ```{r}
 par(mfrow = c(1,2))
@@ -157,13 +306,18 @@ scatter.smooth(dat_cleaned$Cl,dat_cleaned$sleep_hours_avg,col = "light blue")
 scatter.smooth(dat_cleaned$sedentary_activity,dat_cleaned$sleep_hours_avg,col = "light blue")
 ```
 
-
 ```{r}
 pairs(dat_cleaned$sleep_hours_avg ~ dat_cleaned$BMI + dat_cleaned$age + dat_cleaned$Family_income_to_poverty_ratio + dat_cleaned$sedentary_activity,col = "light blue")
 ```
+
 ```{r}
 pairs(dat_cleaned$sleep_hours_avg ~ dat_cleaned$Na + dat_cleaned$K + dat_cleaned$Ca + dat_cleaned$Cl,col = "light blue")
 ```
+
+# Q11
+
+Project Attestation:  No member of this group is using these data or same/similar questions in any other course or course project, at HSPH.  By listing your name as a group member on your project, and submitting this assignment, you are attesting to this statement above.  Groups must include this attestation here under Question 11 in order to receive credit for HW4!
+
 
 # Code Appendix
 
