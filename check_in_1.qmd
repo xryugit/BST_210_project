@@ -1,0 +1,43 @@
+---
+title: "check_in_1"
+format: pdf
+editor: visual
+---
+```
+install.packages(c("tidyverse", "NHANES", "foreign", "haven", "survey", "mice"))
+install.packages("Rnhanesdata")
+```
+
+# Import data
+```{r}
+library(tidyverse)   # For data manipulation and visualization
+library(haven)       # For reading SAS files (.XPT)
+library(NHANES)      # Simplifies accessing NHANES data (optional)
+library(dplyr)  # for inner_join()
+library(purrr)  # for reduce()
+
+getwd()
+setwd("./data/2020")
+
+ALQ <- read_xpt("P_ALQ.XPT")
+BIOPRO <- read_xpt("P_BIOPRO.XPT")
+BMX <- read_xpt("P_BMX.XPT")
+BPXO <- read_xpt("P_BPXO.XPT")
+DEMO <- read_xpt("P_DEMO.XPT")
+# FOLATE <- read_xpt("P_FOLATE.XPT")
+PAQ <- read_xpt("P_PAQ.XPT")
+SLQ <- read_xpt("P_SLQ.XPT")
+TCHOL <- read_xpt("P_TCHOL.XPT")
+
+datasets <- list(ALQ, BIOPRO, BMX, BPXO, DEMO,  PAQ, SLQ, TCHOL)
+
+test <- reduce(datasets, inner_join, by = "SEQN")  # Assuming 'SEQN' is the common identifier
+
+temp <- select(test, SEQN , BMXBMI, ALQ121, RIAGENDR, RIDRETH1, RIDAGEYR, INDFMPIR, LBXSNASI, LBXSKSI, LBDSCASI, LBXSCLSI, PAD680 )
+dat <- left_join(SLQ, temp )
+
+dat_clean <- drop_na(dat)
+# DMDEDUC2(education level 20+)
+# DMDMARTZ - Marital status
+```
+
