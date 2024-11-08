@@ -196,7 +196,6 @@ vif(full_model)
 
 ## forward, backward, both stepwise model selection
 ```{r}
-
 # Model select via both:
 stepModel <- step(full_model, direction=c("both"), trace=0)
 summary(stepModel)
@@ -209,5 +208,30 @@ summary(stepModel)
 null_model <- glm(as.factor(sleep_trouble) ~ 1, family=binomial(), data = dat_cleaned)
 stepModel <- step(null_model, scope = list(lower = null_model, upper = full_model),direction=c("forward"), trace=0)
 summary(stepModel)
+```
+
+## EN
+```{r}
+set.seed(17)
+lambda_grid <- .2 ^ (-50:50)
+covariates <- c("BMI","age","gender","Race_Hispanic_origin",
+             "Family_income_to_poverty_ratio","Na","Cl","Ca",
+             "K")
+dat_EN <- dat_cleaned[, c("sleep_trouble",covariates)]
+x <- model.matrix(sleep_trouble~., data=dat_EN)[,-c(1)]
+y <- dat_EN$sleep_trouble
+
+names(x)<- c("BMI","age","gender","Race_Hispanic_origin",
+             "Family_income_to_poverty_ratio","Na","Cl","Ca",
+             "K")
+EN.fram = glmnet(x,y, alpha=0.5, family="binomial",
+                 lambda=lambda_grid, data=dat_EN)
+cv.EN <- cv.glmnet(x,y, alpha=0.5, family="binomial", data=dat_EN)
+lambda_min_EN <- cv.EN$lambda.min
+lambda_1se_EN <- cv.EN$lambda.1se
+```
+```{r}
+plot(EN.fram)
+coef(cv.EN,s=lambda_1se_EN)
 ```
 
