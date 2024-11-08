@@ -1,0 +1,213 @@
+---
+title: "check_in_2"
+format: pdf
+editor: visual
+---
+
+
+# EDA
+
+## Import data
+
+```{r,warning=FALSE}
+library(tidyverse)   
+library(haven)      
+library(NHANES)     
+library(dplyr)  
+library(purrr)
+library(lubridate)
+library(glmnet)
+library(vip)
+library(car)
+
+getwd()
+setwd("./data/2020")
+
+ALQ <- read_xpt("P_ALQ.XPT")
+BIOPRO <- read_xpt("P_BIOPRO.XPT")
+BMX <- read_xpt("P_BMX.XPT")
+BPXO <- read_xpt("P_BPXO.XPT")
+DEMO <- read_xpt("P_DEMO.XPT")
+# FOLATE <- read_xpt("P_FOLATE.XPT")
+PAQ <- read_xpt("P_PAQ.XPT")
+SLQ <- read_xpt("P_SLQ.XPT")
+TCHOL <- read_xpt("P_TCHOL.XPT")
+
+datasets <- list(ALQ, BIOPRO, BMX, BPXO, DEMO,  PAQ, SLQ, TCHOL)
+test <- reduce(datasets, inner_join, by = "SEQN")  
+
+temp <- select(test, SEQN , BMXBMI, ALQ121, RIAGENDR, RIDRETH1, RIDAGEYR, INDFMPIR, LBXSNASI, LBXSKSI, LBDSCASI, LBXSCLSI, PAD680 )
+dat_raw <- left_join(SLQ, temp)
+
+# DMDEDUC2(education level 20+)
+# DMDMARTZ - Marital status
+```
+
+## scanning raw data
+
+```{r}
+#str(dat_raw) 
+#summary(dat_raw) 
+```
+
+## Data cleaning
+
+```{r}
+# rename cols
+new_colnames <-  c(
+  "ID",      # SEQN;Respondent_sequence_number
+  "sleep_time_weekdays",       # SLQ300;Usual_sleep_time_weekdays
+  "wake_time_weekdays",        # SLQ310;Usual_wake_time_weekdays
+  "sleep_hours_weekdays",            # SLD012;Sleep_hours_weekdays
+  "sleep_time_weekends",       # SLQ320;Usual_sleep_time_weekends
+  "wake_time_weekends",        # SLQ330;Usual_wake_time_weekends
+  "sleep_hours_weekends",            # SLD013;Sleep_hours_weekends
+  "frq_snore",                 # SLQ030;How_often_snore
+  "frq_snort_or_stop_breathing",# SLQ040;How_often_snort_or_stop_breathing
+  "sleep_trouble",  # SLQ050;Ever_told_doctor_sleep_trouble (2:NO, 1:YES)
+  "overly_sleepy",          # SLQ120;Feel_overly_sleepy_day
+  "BMI",                 # BMXBMI;Body_Mass_Index
+  "alcohol",         # ALQ121;How_often_drink_alcohol
+  "gender",                          # RIAGENDR;Gender
+  "Race_Hispanic_origin",            # RIDRETH1;Race_Hispanic_origin
+  "age",                # RIDAGEYR;Age_at_screening
+  "Family_income_to_poverty_ratio",  # INDFMPIR;Family_income_to_poverty_ratio
+  "Na",                   # LBXSNASI;Sodium_mmol_L
+  "K",                # LBXSLSI;Potassium_mmol_L
+  "Ca",            # LBDSCASI;Total_Calcium_mmol_L
+  "Cl",                 # LBXSCLSI;Chloride_mmol_L
+  "sedentary_activity"       # PAD680;Minutes_sedentary_activity
+)
+colnames(dat_raw) <- new_colnames
+# remove all lines with NA
+dat_raw[dat_raw == ""] <- NA
+dat_clean <- dat_raw |>
+  drop_na() |>
+   filter(alcohol != 7 & frq_snore != 7 & frq_snore != 9 & frq_snort_or_stop_breathing != 7 & frq_snort_or_stop_breathing != 9 & sleep_trouble != 9 & overly_sleepy != 9 & sleep_trouble != 7) |>
+  mutate(across(c(sleep_time_weekdays,wake_time_weekdays,sleep_time_weekends,wake_time_weekends), hm)) |>
+  mutate(across(c(ID,frq_snore,frq_snort_or_stop_breathing,sleep_trouble,overly_sleepy,alcohol,gender,Race_Hispanic_origin),as.factor)) |>
+  mutate(across(c(,),as.numeric)) |>
+  mutate(sleep_hours_avg = 2/7*sleep_hours_weekends+5/7*sleep_hours_weekdays)
+
+
+```
+
+## scanning cleaned data
+
+```{r, eval=FALSE}
+#str(dat_clean) 
+#summary(dat_clean) 
+```
+
+## Histogram and barplot of outcome
+
+```{r}
+par(mfrow = c(1,2))
+barplot(table(dat_clean$sleep_trouble), xlab = "1 = Yes; 2 = No", main = "Barplot of sleep_trouble", ylab = "Frequency")
+hist(dat_clean$sleep_hours_avg, main = "Histogram of avg sleep hours",breaks = 30, xlab = "avg sleep hours")
+```
+
+## Histogram of continuous variables X
+
+```{r}
+par(mfrow = c(1,2))
+hist(dat_clean$BMI,main = "BMI",xlab = "BMI")
+hist(dat_clean$age,main = "age", xlab = "age")
+```
+
+```{r}
+hist(dat_clean$Family_income_to_poverty_ratio,main = "Family_income_to_poverty_ratio", xlab = "Family_income_to_poverty_ratio",breaks = 70)
+```
+
+```{r}
+par(mfrow = c(1,2))
+hist(dat_clean$Na,main = "Na",xlab = "Na(mmol/L)",breaks = 30)
+hist(dat_clean$K,main = "K", xlab = "K(mmol/L)",breaks = 30)
+```
+
+```{r}
+par(mfrow = c(1,2))
+hist(dat_clean$Ca,main = "Ca",xlab = "Ca(mmol/L)",breaks = 30)
+hist(dat_clean$Cl,main = "Cl", xlab = "Cl(mmol/L)",,breaks = 30)
+```
+
+```{r}
+hist(dat_clean$sedentary_activity,main = "sedentary_activity",xlab = "sedentary_activity(mins)",breaks = 70)
+```
+
+Obviously, 9000 minutes is more than the possible range of a day (1440 minutes). Thus these high leverage points are errors. It's better to remove them.
+
+```{r}
+dat_cleaned <- dat_clean |>
+  filter(sedentary_activity < 9000)
+hist(dat_cleaned$sedentary_activity,main = "sedentary_activity replot",xlab = "sedentary_activity(mins)",breaks = 10)
+dat_cleaned$sleep_trouble = ifelse(dat_cleaned$sleep_trouble == "2", 0, 1)
+```
+
+## Boxplot
+
+```{r}
+boxplot(dat_clean$sleep_hours_avg~dat_clean$alcohol, main = "Boxplot of avg sleep hours vs alcohol",xlab = "How often drink alcohol")
+```
+
+```{r}
+boxplot(dat_clean$sleep_hours_avg~dat_clean$gender,main = "Boxplot of avg sleep hours vs gender",xlab = "1 = Male; 2 = Female")
+```
+
+```{r}
+boxplot(dat_clean$sleep_hours_avg~dat_clean$Race_Hispanic_origin,main = "Boxplot of avg sleep hours vs races",xlab = "1 = Mexican American; 2 = Other Hispanic; 3 = White; 4 = Black; 5 = Other Race")
+```
+
+## Correlations
+
+```{r}
+par(mfrow = c(1,2))
+scatter.smooth(dat_cleaned$BMI,dat_cleaned$sleep_hours_avg,col = "light blue")
+scatter.smooth(dat_cleaned$age,dat_cleaned$sleep_hours_avg,col = "light blue")
+scatter.smooth(dat_cleaned$Family_income_to_poverty_ratio,dat_cleaned$sleep_hours_avg,col = "light blue")
+scatter.smooth(dat_cleaned$Na,dat_cleaned$sleep_hours_avg,col = "light blue")
+scatter.smooth(dat_cleaned$K,dat_cleaned$sleep_hours_avg,col = "light blue")
+scatter.smooth(dat_cleaned$Ca,dat_cleaned$sleep_hours_avg,col = "light blue")
+scatter.smooth(dat_cleaned$Cl,dat_cleaned$sleep_hours_avg,col = "light blue")
+scatter.smooth(dat_cleaned$sedentary_activity,dat_cleaned$sleep_hours_avg,col = "light blue")
+```
+
+```{r}
+pairs(dat_cleaned$sleep_hours_avg ~ dat_cleaned$BMI + dat_cleaned$age + dat_cleaned$Family_income_to_poverty_ratio + dat_cleaned$sedentary_activity,col = "light blue")
+```
+
+```{r}
+pairs(dat_cleaned$sleep_hours_avg ~ dat_cleaned$Na + dat_cleaned$K + dat_cleaned$Ca + dat_cleaned$Cl,col = "light blue")
+```
+
+# Model Development and Selection
+
+## primary 
+
+## VIF
+```{r}
+full_model <- glm(
+  as.factor(sleep_trouble) ~ BMI  + as.factor(gender) + as.factor(Race_Hispanic_origin) + age + Family_income_to_poverty_ratio + Na + K + Ca + Cl + sedentary_activity,
+  data = dat_cleaned,
+  family = binomial(link = "logit")
+)
+vif(full_model)
+```
+
+## forward, backward, both stepwise model selection
+```{r}
+
+# Model select via both:
+stepModel <- step(full_model, direction=c("both"), trace=0)
+summary(stepModel)
+
+# Model select via backward:
+stepModel <- step(full_model, direction=c("backward"), trace=0)
+summary(stepModel)
+
+# Model select via forward:
+null_model <- glm(as.factor(sleep_trouble) ~ 1, family=binomial(), data = dat_cleaned)
+stepModel <- step(null_model, scope = list(lower = null_model, upper = full_model),direction=c("forward"), trace=0)
+summary(stepModel)
+```
+
