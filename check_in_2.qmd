@@ -4,7 +4,6 @@ format: pdf
 editor: visual
 ---
 
-
 # EDA
 
 ## Import data
@@ -55,28 +54,28 @@ dat_raw <- left_join(SLQ, temp)
 ```{r}
 # rename cols
 new_colnames <-  c(
-  "ID",      # SEQN;Respondent_sequence_number
-  "sleep_time_weekdays",       # SLQ300;Usual_sleep_time_weekdays
-  "wake_time_weekdays",        # SLQ310;Usual_wake_time_weekdays
-  "sleep_hours_weekdays",            # SLD012;Sleep_hours_weekdays
-  "sleep_time_weekends",       # SLQ320;Usual_sleep_time_weekends
-  "wake_time_weekends",        # SLQ330;Usual_wake_time_weekends
-  "sleep_hours_weekends",            # SLD013;Sleep_hours_weekends
-  "frq_snore",                 # SLQ030;How_often_snore
+  "ID",# SEQN;Respondent_sequence_number
+  "sleep_time_weekdays",# SLQ300;Usual_sleep_time_weekdays
+  "wake_time_weekdays", # SLQ310;Usual_wake_time_weekdays
+  "sleep_hours_weekdays",# SLD012;Sleep_hours_weekdays
+  "sleep_time_weekends",# SLQ320;Usual_sleep_time_weekends
+  "wake_time_weekends",# SLQ330;Usual_wake_time_weekends
+  "sleep_hours_weekends",# SLD013;Sleep_hours_weekends
+  "frq_snore",# SLQ030;How_often_snore
   "frq_snort_or_stop_breathing",# SLQ040;How_often_snort_or_stop_breathing
-  "sleep_trouble",  # SLQ050;Ever_told_doctor_sleep_trouble (2:NO, 1:YES)
-  "overly_sleepy",          # SLQ120;Feel_overly_sleepy_day
-  "BMI",                 # BMXBMI;Body_Mass_Index
-  "alcohol",         # ALQ121;How_often_drink_alcohol
-  "gender",                          # RIAGENDR;Gender
-  "Race_Hispanic_origin",            # RIDRETH1;Race_Hispanic_origin
-  "age",                # RIDAGEYR;Age_at_screening
-  "Family_income_to_poverty_ratio",  # INDFMPIR;Family_income_to_poverty_ratio
-  "Na",                   # LBXSNASI;Sodium_mmol_L
-  "K",                # LBXSLSI;Potassium_mmol_L
-  "Ca",            # LBDSCASI;Total_Calcium_mmol_L
-  "Cl",                 # LBXSCLSI;Chloride_mmol_L
-  "sedentary_activity"       # PAD680;Minutes_sedentary_activity
+  "sleep_trouble",# SLQ050;Ever_told_doctor_sleep_trouble (2:NO, 1:YES)
+  "overly_sleepy",# SLQ120;Feel_overly_sleepy_day
+  "BMI",# BMXBMI;Body_Mass_Index
+  "alcohol",# ALQ121;How_often_drink_alcohol
+  "gender", # RIAGENDR;Gender
+  "Race_Hispanic_origin",# RIDRETH1;Race_Hispanic_origin
+  "age",# RIDAGEYR;Age_at_screening
+  "Family_income_to_poverty_ratio",# INDFMPIR;Family_income_to_poverty_ratio
+  "Na",# LBXSNASI;Sodium_mmol_L
+  "K",# LBXSLSI;Potassium_mmol_L
+  "Ca",# LBDSCASI;Total_Calcium_mmol_L
+  "Cl",# LBXSCLSI;Chloride_mmol_L
+  "sedentary_activity"# PAD680;Minutes_sedentary_activity
 )
 colnames(dat_raw) <- new_colnames
 # remove all lines with NA
@@ -182,9 +181,10 @@ pairs(dat_cleaned$sleep_hours_avg ~ dat_cleaned$Na + dat_cleaned$K + dat_cleaned
 
 # Model Development and Selection
 
-## primary 
+## primary
 
 ## VIF
+
 ```{r}
 full_model <- glm(
   as.factor(sleep_trouble) ~ BMI  + as.factor(gender) + as.factor(Race_Hispanic_origin) + age + Family_income_to_poverty_ratio + Na + K + Ca + Cl + sedentary_activity,
@@ -195,6 +195,7 @@ vif(full_model)
 ```
 
 ## forward, backward, both stepwise model selection
+
 ```{r}
 # Model select via both:
 stepModel <- step(full_model, direction=c("both"), trace=0)
@@ -211,6 +212,7 @@ summary(stepModel)
 ```
 
 ## EN
+
 ```{r}
 set.seed(17)
 lambda_grid <- .2 ^ (-50:50)
@@ -230,8 +232,8 @@ cv.EN <- cv.glmnet(x,y, alpha=0.5, family="binomial", data=dat_EN)
 lambda_min_EN <- cv.EN$lambda.min
 lambda_1se_EN <- cv.EN$lambda.1se
 ```
+
 ```{r}
 plot(EN.fram)
 coef(cv.EN,s=lambda_1se_EN)
 ```
-
