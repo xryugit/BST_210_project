@@ -151,6 +151,8 @@ install.packages("Rnhanesdata")
 
 ## Import data
 
+mutate(DPQ, )
+
 ```{r,warning=FALSE}
 library(tidyverse)   
 library(haven)      
@@ -167,15 +169,34 @@ BIOPRO <- read_xpt("P_BIOPRO.XPT")
 BMX <- read_xpt("P_BMX.XPT")
 BPXO <- read_xpt("P_BPXO.XPT")
 DEMO <- read_xpt("P_DEMO.XPT")
-# FOLATE <- read_xpt("P_FOLATE.XPT")
+#FOLATE <- read_xpt("P_FOLATE.XPT")
 PAQ <- read_xpt("P_PAQ.XPT")
 SLQ <- read_xpt("P_SLQ.XPT")
 TCHOL <- read_xpt("P_TCHOL.XPT")
+DPQ_raw <- read_xpt("P_DPQ.XPT")
+FETIB <- read_xpt("P_FETIB.XPT")
 
-datasets <- list(ALQ, BIOPRO, BMX, BPXO, DEMO,  PAQ, SLQ, TCHOL)
+DPQ <- DPQ_raw %>%
+    # Remove rows with any NA in DPQ columns (excluding SEQN)
+    filter(complete.cases(select(., starts_with("DPQ"))[-1])) %>%
+    # Calculate total depression score
+    mutate(depression_score = rowSums(select(., starts_with("DPQ"))[-1])) %>%
+    # Categorize total depression score into levels
+    mutate(depression_category = case_when(
+        depression_score <= 4 ~ "Minimal",
+        depression_score <= 9 ~ "Mild",
+        depression_score <= 14 ~ "Moderate",
+        depression_score <= 19 ~ "Moderately severe",
+        depression_score >= 20 ~ "Severe"
+    ))
+
+
+datasets <- list(ALQ, BIOPRO, BMX, BPXO, DEMO,  PAQ, SLQ, TCHOL, DPQ)
 test <- reduce(datasets, inner_join, by = "SEQN")  
 
-temp <- select(test, SEQN , BMXBMI, ALQ121, RIAGENDR, RIDRETH1, RIDAGEYR, INDFMPIR, LBXSNASI, LBXSKSI, LBDSCASI, LBXSCLSI, PAD680 )
+
+temp <- select(test, SEQN , BMXBMI, ALQ121, RIAGENDR, RIDRETH1, RIDAGEYR, INDFMPIR, LBXSNASI, LBXSKSI, LBDSCASI, LBXSCLSI, PAD680, depression_score, depression_category)
+
 dat_raw <- left_join(SLQ, temp)
 
 # DMDEDUC2(education level 20+)
@@ -215,7 +236,10 @@ new_colnames <-  c(
   "K",                # LBXSLSI;Potassium_mmol_L
   "Ca",            # LBDSCASI;Total_Calcium_mmol_L
   "Cl",                 # LBXSCLSI;Chloride_mmol_L
-  "sedentary_activity"       # PAD680;Minutes_sedentary_activity
+  "sedentary_activity",       # PAD680;Minutes_sedentary_activity
+  "dp_score",
+  "dp_cate"
+  
 )
 colnames(dat_raw) <- new_colnames
 # remove all lines with NA
@@ -307,6 +331,7 @@ scatter.smooth(dat_cleaned$K,dat_cleaned$sleep_hours_avg,col = "light blue")
 scatter.smooth(dat_cleaned$Ca,dat_cleaned$sleep_hours_avg,col = "light blue")
 scatter.smooth(dat_cleaned$Cl,dat_cleaned$sleep_hours_avg,col = "light blue")
 scatter.smooth(dat_cleaned$sedentary_activity,dat_cleaned$sleep_hours_avg,col = "light blue")
+scatter.smooth(dat_cleaned$dp_score,dat_cleaned$sleep_hours_avg,col = "light blue")
 ```
 
 ```{r}
@@ -314,7 +339,120 @@ pairs(dat_cleaned$sleep_hours_avg ~ dat_cleaned$BMI + dat_cleaned$age + dat_clea
 ```
 
 ```{r}
-pairs(dat_cleaned$sleep_hours_avg ~ dat_cleaned$Na + dat_cleaned$K + dat_cleaned$Ca + dat_cleaned$Cl,col = "light blue")
+# Example for a continuous variable (BMI)
+boxplot(BMI ~ sleep_trouble, data = dat_cleaned, 
+        xlab = "Sleep Trouble (Binary)",
+        ylab = "BMI",
+        main = "BMI vs Sleep Trouble",
+        col = "lightblue")
+
+
+
+
+```
+
+```{r}
+ggplot(dat_cleaned, aes(x = as.factor(gender), fill = as.factor(sleep_trouble))) +
+    geom_bar(position = "dodge") +
+    labs(x = "Gender", y = "Count", fill = "Sleep Trouble") +
+    ggtitle("Gender vs Sleep Trouble")
+```
+
+```{r}
+# Example for an ordinal variable (alcohol)
+boxplot(alcohol ~ sleep_trouble, data = dat_cleaned,
+        xlab = "Sleep Trouble (Binary)",
+        ylab = "Alcohol Frequency",
+        main = "Alcohol Frequency vs Sleep Trouble",
+        col = "lightblue")
+
+```
+
+```{r}
+# Define the list of continuous covariates
+continuous_covariates <- c("BMI", "Family_income_to_poverty_ratio", "Na", "K", "Ca", "Cl", "sedentary_activity", "dp_score")
+
+# Loop through each covariate and generate a density plot
+
+for (covariate in continuous_covariates) {
+    # Create the density plot
+    p <- ggplot(dat_cleaned, aes_string(x = covariate, fill = "factor(sleep_trouble)")) +
+        geom_density(alpha = 0.5) +
+        labs(x = covariate, fill = "Sleep Trouble") +
+        ggtitle(paste("Density Plot of", covariate, "by Sleep Trouble")) +
+        theme_minimal()
+    
+    # Print the plot
+    print(p)
+}
+
+
+```
+
+```{r}
+# Define the list of categorical covariates
+categorical_covariates <- c("gender", "Race_Hispanic_origin", "alcohol", "dp_cate" )
+
+# Loop through each categorical covariate and generate a bar plot
+
+for (covariate in categorical_covariates) {
+    # Create the bar plot
+    p <- ggplot(dat_cleaned, aes_string(x = covariate, fill = "as.factor(sleep_trouble)")) +
+        geom_bar(position = "dodge") +
+        labs(x = covariate, fill = "Sleep Trouble") +
+        ggtitle(paste("Bar Plot of", covariate, "by Sleep Trouble")) +
+        theme_minimal()
+    
+    # Print the plot
+    print(p)
+}
+
+```
+
+```{r}
+# Define the list of continuous covariates
+continuous_covariates <- c("BMI", "Family_income_to_poverty_ratio", "Na", "K", "Ca", "Cl", "sedentary_activity", "dp_score")
+
+# Loop through each continuous covariate and generate a boxplot
+
+for (covariate in continuous_covariates) {
+    # Create the boxplot
+    p <- ggplot(dat_cleaned, aes_string(x = "factor(sleep_trouble)", y = covariate, fill = "factor(sleep_trouble)")) +
+        geom_boxplot() +
+        labs(x = "Sleep Trouble", y = covariate, fill = "Sleep Trouble") +
+        ggtitle(paste("Boxplot of", covariate, "by Sleep Trouble")) +
+        theme_minimal()
+    
+    # Print the plot
+    print(p)
+}
+
+```
+
+```{r}
+# Define the formula for logistic regression with all covariates
+formula <- sleep_time_weekdays ~ BMI + alcohol + gender + Race_Hispanic_origin + 
+           age + Family_income_to_poverty_ratio + Na + K + Ca + Cl + sedentary_activity + dp_cate
+
+# Fit the logistic regression model
+logistic_model <- glm(formula, data = dat_cleaned, family = binomial)
+
+# Display the model summary
+summary(logistic_model)
+
+```
+
+```{r}
+# Define the formula for logistic regression with all covariates
+formula <- as.numeric(sleep_time_weekdays) ~ BMI + alcohol + gender + Race_Hispanic_origin + 
+           age + Family_income_to_poverty_ratio + Na + K + Ca + Cl + sedentary_activity + dp_cate
+
+# Fit the logistic regression model
+linear_model <- lm(formula, data = dat_cleaned)
+
+# Display the model summary
+summary(linear_model)
+
 ```
 
 # Q11
