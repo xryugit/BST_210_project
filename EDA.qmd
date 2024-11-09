@@ -1,0 +1,334 @@
+---
+title: "EDA"
+format: pdf
+editor: visual
+execute:
+  echo: false
+---
+
+**Group 26**
+
+**Academic Grasshoppers**
+
+**Yinjie Wu**
+
+**Yuan Tian**
+
+**Xinran Yu**
+
+No member of this group is using these data or same/similar questions in any other course or course project, at HSPH.
+
+![](images/image.png)
+
+```         
+install.packages(c("tidyverse", "NHANES", "foreign", "haven", "survey", "mice"))
+install.packages("Rnhanesdata")
+```
+
+## Import data
+
+mutate(DPQ, )
+
+```{r,warning=FALSE}
+library(tidyverse)   
+library(haven)      
+library(NHANES)     
+library(dplyr)  
+library(purrr)
+library(lubridate)
+
+getwd()
+setwd("./data/13_14")
+
+ALQ <- read_xpt("ALQ_H.XPT")
+BIOPRO <- read_xpt("BIOPRO_H.XPT")
+BMX <- read_xpt("BMX_H.XPT")
+BPX <- read_xpt("BPX_H.XPT")
+CAFE <- read_xpt("CAFE_H.XPT")
+CUSEZN <- read_xpt("CUSEZN_H.XPT") #zinc
+DEMO <- read_xpt("DEMO_H.XPT")
+DPQ_raw <- read_xpt("DPQ_H.XPT")
+GLU <- read_xpt("GLU_H.XPT")
+INQ <- read_xpt("INQ_H.XPT")
+PAQ <- read_xpt("PAQ_H.XPT")
+SLQ <- read_xpt("SLQ_H.XPT")
+TCHOL <- read_xpt("TCHOL_H.XPT")
+VID <- read_xpt("VID_H.XPT")
+VITB12 <- read_xpt("VITB12_H.XPT")
+
+DPQ <- DPQ_raw %>%
+    # Remove rows with any NA in DPQ columns (excluding SEQN)
+    filter(complete.cases(select(., starts_with("DPQ"))[-1])) %>%
+    # Calculate total depression score
+    mutate(depression_score = rowSums(select(., starts_with("DPQ"))[-1])) %>%
+    # Categorize total depression score into levels
+    mutate(depression_category = case_when(
+        depression_score <= 4 ~ "Minimal",
+        depression_score <= 9 ~ "Mild",
+        depression_score <= 14 ~ "Moderate",
+        depression_score <= 19 ~ "Moderately severe",
+        depression_score >= 20 ~ "Severe"
+    ))
+
+# Calculate average systolic and diastolic blood pressure using all four readings
+BPX <- BPX %>%
+  mutate(
+    avg_systolic = rowMeans(select(., BPXSY1, BPXSY2, BPXSY3, BPXSY4), na.rm = TRUE),
+    avg_diastolic = rowMeans(select(., BPXDI1, BPXDI2, BPXDI3, BPXDI4), na.rm = TRUE)
+  )
+
+# Add screen time variable to PAQ dataset with custom recoding
+PAQ <- PAQ %>%
+  mutate(
+    PAQ710 = case_when(
+      PAQ710 == 8 ~ 0,
+      PAQ710 == 77 ~ NA_real_,
+      PAQ710 == 99 ~ NA_real_,
+      TRUE ~ as.numeric(PAQ710)
+    ),
+    PAQ715 = case_when(
+      PAQ715 == 8 ~ 0,
+      PAQ715 == 77 ~ NA_real_,
+      PAQ715 == 99 ~ NA_real_,
+      TRUE ~ as.numeric(PAQ715)
+    ),
+    screen_time = PAQ710 + PAQ715
+  )
+
+# View a glimpse of the modified dataset to confirm the changes
+glimpse(PAQ)
+
+
+# View a glimpse of the modified dataset to confirm the changes
+glimpse(BPX)
+
+
+datasets <- list(ALQ, BIOPRO, BMX,BPX, DEMO , PAQ, SLQ, TCHOL, DPQ , INQ, VID, VITB12)
+test <- reduce(datasets, inner_join, by = "SEQN")  
+
+
+temp <- select(test, SEQN, RIDAGEYR, RIAGENDR, RIDRETH3, ALQ120Q , BMXBMI, avg_systolic,INDFMMPI, screen_time ,PAD680 ,LBDTCSI, SLD010H ,SLQ050, SLQ060, depression_score, depression_category, LBXVIDMS, LBDB12SI)
+
+dat_raw <- left_join(SLQ, temp)
+
+# DMDEDUC2(education level 20+)
+# DMDMARTZ - Marital status
+```
+
+## scanning raw data
+
+```{r}
+str(dat_raw) 
+summary(dat_raw) 
+```
+
+## Data cleaning
+
+```{r}
+# rename cols
+new_colnames <- c(
+  "ID",                           # SEQN; Respondent sequence number
+  "age",                          # RIDAGEYR; Age at screening
+  "gender",                       # RIAGENDR; Gender
+  "race_ethnicity",               # RIDRETH3; Race/Ethnicity category
+  "alcohol",     # ALQ120Q; How often drank alcohol in past 12 months
+  "BMI",
+  "avg_systolic_bp",              # avg_systolic; Average systolic blood pressure
+  "income", # INDFMMPI; Family income to poverty ratio
+  "screen_time",                   # TV+computer time
+  "sedentary_minutes",            # PAD680; Minutes of sedentary activity
+  "total_cholesterol",            # LBDTCSI; Total cholesterol (mg/dL)
+  "sleep_hours",            # SLD010H; Usual hours of sleep on weekdays
+  "sleep_trouble",          # SLQ050; Ever told doctor had trouble sleeping?
+  "sleep_diagnosed",        # SLQ060; Ever told by doctor have sleep disorder?
+  "depression_score",             # depression_score; Calculated total depression score
+  "depression_category",          # depression_category; Depression score category
+  "vitamin_d",                    # LBXVIDMS; Vitamin D level (nmol/L)
+  "vitamin_b12"                   # LBDB12SI; Vitamin B12 level (pmol/L)
+)
+colnames(dat_raw) <- new_colnames
+# remove all lines with NA
+dat_raw[dat_raw == ""] <- NA
+dat_clean <- dat_raw |>
+  drop_na() |>
+   filter(alcohol > 400 & sleep_trouble != 9 & sedentary_minutes < 3000 & sleep_hours < 66 & sleep_trouble < 3 & sleep_diagnosed <3) |>
+  mutate(across(c(sleep_hours), hm)) |>
+  mutate(across(c(ID,sleep_trouble,sleep_diagnosed,gender,race_ethnicity),as.factor)) 
+  
+
+```
+
+## scanning cleaned data
+
+```{r}
+str(dat_clean) 
+summary(dat_clean) 
+```
+
+## Correlations
+
+```{r}
+par(mfrow = c(1,2))
+scatter.smooth(dat_cleaned$BMI,dat_cleaned$sleep_hours_avg,col = "light blue")
+scatter.smooth(dat_cleaned$age,dat_cleaned$sleep_hours_avg,col = "light blue")
+scatter.smooth(dat_cleaned$Family_income_to_poverty_ratio,dat_cleaned$sleep_hours_avg,col = "light blue")
+scatter.smooth(dat_cleaned$Na,dat_cleaned$sleep_hours_avg,col = "light blue")
+scatter.smooth(dat_cleaned$K,dat_cleaned$sleep_hours_avg,col = "light blue")
+scatter.smooth(dat_cleaned$Ca,dat_cleaned$sleep_hours_avg,col = "light blue")
+scatter.smooth(dat_cleaned$Cl,dat_cleaned$sleep_hours_avg,col = "light blue")
+scatter.smooth(dat_cleaned$sedentary_activity,dat_cleaned$sleep_hours_avg,col = "light blue")
+scatter.smooth(dat_cleaned$dp_score,dat_cleaned$sleep_hours_avg,col = "light blue")
+```
+
+```{r}
+pairs(dat_cleaned$sleep_hours_avg ~ dat_cleaned$BMI + dat_cleaned$age + dat_cleaned$Family_income_to_poverty_ratio + dat_cleaned$sedentary_activity,col = "light blue")
+```
+
+```{r}
+# Example for a continuous variable (BMI)
+boxplot(BMI ~ sleep_trouble, data = dat_cleaned, 
+        xlab = "Sleep Trouble (Binary)",
+        ylab = "BMI",
+        main = "BMI vs Sleep Trouble",
+        col = "lightblue")
+
+
+
+
+```
+
+```{r}
+ggplot(dat_cleaned, aes(x = as.factor(gender), fill = as.factor(sleep_trouble))) +
+    geom_bar(position = "dodge") +
+    labs(x = "Gender", y = "Count", fill = "Sleep Trouble") +
+    ggtitle("Gender vs Sleep Trouble")
+```
+
+```{r}
+# Example for an ordinal variable (alcohol)
+boxplot(alcohol ~ sleep_trouble, data = dat_cleaned,
+        xlab = "Sleep Trouble (Binary)",
+        ylab = "Alcohol Frequency",
+        main = "Alcohol Frequency vs Sleep Trouble",
+        col = "lightblue")
+
+```
+
+```{r}
+# Define the list of continuous covariates
+continuous_covariates <- c("BMI", "Family_income_to_poverty_ratio", "Na", "K", "Ca", "Cl", "sedentary_activity", "dp_score")
+
+# Loop through each covariate and generate a density plot
+
+for (covariate in continuous_covariates) {
+    # Create the density plot
+    p <- ggplot(dat_cleaned, aes_string(x = covariate, fill = "factor(sleep_trouble)")) +
+        geom_density(alpha = 0.5) +
+        labs(x = covariate, fill = "Sleep Trouble") +
+        ggtitle(paste("Density Plot of", covariate, "by Sleep Trouble")) +
+        theme_minimal()
+    
+    # Print the plot
+    print(p)
+}
+
+
+```
+
+```{r}
+# Define the list of categorical covariates
+categorical_covariates <- c("gender", "Race_Hispanic_origin", "alcohol", "dp_cate" )
+
+# Loop through each categorical covariate and generate a bar plot
+
+for (covariate in categorical_covariates) {
+    # Create the bar plot
+    p <- ggplot(dat_cleaned, aes_string(x = covariate, fill = "as.factor(sleep_trouble)")) +
+        geom_bar(position = "dodge") +
+        labs(x = covariate, fill = "Sleep Trouble") +
+        ggtitle(paste("Bar Plot of", covariate, "by Sleep Trouble")) +
+        theme_minimal()
+    
+    # Print the plot
+    print(p)
+}
+
+```
+
+```{r}
+# Define the list of continuous covariates
+continuous_covariates <- c("BMI", "Family_income_to_poverty_ratio", "Na", "K", "Ca", "Cl", "sedentary_activity", "dp_score")
+
+# Loop through each continuous covariate and generate a boxplot
+
+for (covariate in continuous_covariates) {
+    # Create the boxplot
+    p <- ggplot(dat_cleaned, aes_string(x = "factor(sleep_trouble)", y = covariate, fill = "factor(sleep_trouble)")) +
+        geom_boxplot() +
+        labs(x = "Sleep Trouble", y = covariate, fill = "Sleep Trouble") +
+        ggtitle(paste("Boxplot of", covariate, "by Sleep Trouble")) +
+        theme_minimal()
+    
+    # Print the plot
+    print(p)
+}
+
+```
+
+```{r}
+f1 <- sleep_trouble ~ dp_cate
+simple_model <- glm(f1, data= dat_cleaned, family= binomial)
+summary(simple_model)
+```
+
+```{r}
+f2 <- sleep_trouble ~ BMI + alcohol + gender + Race_Hispanic_origin + 
+           age + Family_income_to_poverty_ratio +  sedentary_activity + dp_cate
+mod2 <- glm(f2, data= dat_cleaned, family= binomial)
+summary(mod2)
+```
+
+```{r}
+# Define the formula for logistic regression with all covariates
+formula <- sleep_trouble ~ BMI + alcohol + gender + Race_Hispanic_origin + 
+           age + Family_income_to_poverty_ratio + Na + K + Ca + Cl + sedentary_activity + dp_cate
+
+# Fit the logistic regression model
+logistic_model <- glm(formula, data = dat_cleaned, family = binomial)
+
+# Display the model summary
+summary(logistic_model)
+
+```
+
+```{r}
+# Define the formula for logistic regression with all covariates
+formula <- as.numeric(sleep_trouble) ~ BMI + alcohol + gender + Race_Hispanic_origin + 
+           age + Family_income_to_poverty_ratio + Na + K + Ca + Cl + sedentary_activity + dp_cate
+
+# Fit the logistic regression model
+linear_model <- lm(formula, data = dat_cleaned)
+
+# Display the model summary
+summary(linear_model)
+
+```
+
+# Q11
+
+**Group 26**
+
+**Academic Grasshoppers**
+
+**Yinjie Wu**
+
+**Yuan Tian**
+
+**Xinran Yu**
+
+Project Attestation: No member of this group is using these data or same/similar questions in any other course or course project, at HSPH. By listing your name as a group member on your project, and submitting this assignment, you are attesting to this statement above. Groups must include this attestation here under Question 11 in order to receive credit for HW4!
+
+# Code Appendix
+
+```{r, ref.label=knitr::all_labels(),echo=TRUE,eval=FALSE}
+```
