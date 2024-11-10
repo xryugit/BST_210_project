@@ -30,13 +30,16 @@ install.packages("Rnhanesdata")
 mutate(DPQ, )
 
 ```{r,warning=FALSE}
+library(sampleSelection)
 library(tidyverse)   
 library(haven)      
 library(NHANES)     
 library(dplyr)  
 library(purrr)
 library(lubridate)
-
+library(mice)
+library(naniar)
+library(ggrepel)
 getwd()
 setwd("./data/13_14")
 
@@ -56,9 +59,9 @@ TCHOL <- read_xpt("TCHOL_H.XPT")
 VID <- read_xpt("VID_H.XPT")
 VITB12 <- read_xpt("VITB12_H.XPT")
 
-DPQ <- DPQ_raw %>%
-    filter(complete.cases(select(., starts_with("DPQ"))[-1])) %>%
-    mutate(depression_score = rowSums(select(., starts_with("DPQ"))[-1])) %>%
+DPQ <- DPQ_raw %>% 
+    filter(complete.cases(select(., starts_with("DPQ"))[-1])) %>% 
+    mutate(depression_score = rowSums(select(., starts_with("DPQ"))[-1])) |> #%>% 
     mutate(depression_category = case_when(
         depression_score <= 4 ~ "Minimal",
         depression_score <= 9 ~ "Mild",
@@ -96,7 +99,7 @@ datasets <- list(ALQ, BIOPRO, BMX,BPX, DEMO , PAQ, SLQ, TCHOL, DPQ , INQ, VID, V
 test <- reduce(datasets, inner_join, by = "SEQN")  
 
 
-temp <- select(test, SEQN, RIDAGEYR, RIAGENDR, RIDRETH3, ALQ120Q , BMXBMI, avg_systolic,INDFMMPI, screen_time ,PAD680 ,LBDTCSI, SLD010H ,SLQ050, SLQ060, depression_score, depression_category, LBXVIDMS, LBDB12SI)
+temp <- select(test, SEQN, RIDAGEYR, RIAGENDR, RIDRETH3, ALQ130 , BMXBMI, avg_systolic,INDFMMPI, screen_time ,PAD680 ,LBDTCSI, SLD010H ,SLQ050, SLQ060, depression_score, depression_category, LBXVIDMS, LBDB12SI)
 
 dat_raw <- left_join(SLQ, temp)
 
@@ -142,7 +145,7 @@ colnames(dat_raw) <- new_colnames
 dat_raw[dat_raw == ""] <- NA
 dat_clean <- dat_raw |>
   drop_na() |>
-  filter(alcohol < 400  & sedentary_minutes < 6000 & sleep_hours < 66 & sleep_trouble < 3 & sleep_diagnosed < 3 & vitamin_b12 <= 2500 & vitamin_d <= 200, total_cholesterol < 20) |>
+  filter(alcohol < 16  & sedentary_minutes < 6000 & sleep_hours < 66 & sleep_trouble < 3 & sleep_diagnosed < 3 & vitamin_b12 <= 2500 & vitamin_d <= 200, total_cholesterol < 20) |>
   mutate(across(c(ID, sleep_trouble, sleep_diagnosed, gender, race_ethnicity), as.factor))
 
 
@@ -163,7 +166,7 @@ summary(dat_clean)
 
 summary(dat_clean)
 
-numeric_vars <- select(dat_clean, age, BMI, avg_systolic_bp, income, screen_time, sedentary_minutes, total_cholesterol, sleep_hours, depression_score, vitamin_d, vitamin_b12)
+numeric_vars <- select(dat_clean, age, BMI, avg_systolic_bp, income, screen_time, sedentary_minutes, total_cholesterol, sleep_hours, depression_score, vitamin_d, vitamin_b12, alcohol)
 
 
 for (col in colnames(numeric_vars)) {
@@ -359,6 +362,105 @@ ggplot(dat_clean, aes(x = sleep_diagnosed, y = sleep_hours)) +
     y = "Usual Sleep Hours"
   ) +
   theme_minimal()
+```
+
+```{r}
+#write.csv(dat_clean, "2013_14_clean.csv", row.names = FALSE)
+```
+
+
+```{r}
+
+dat_temp <- DEMO
+other_dfs <- Filter(function(df) !is.null(df) && "SEQN" %in% colnames(df), 
+                    list(ALQ, BIOPRO, BMX,BPX,  PAQ, SLQ, TCHOL, DPQ , INQ, VID, VITB12))
+for (df in other_dfs) {
+    dat_temp <- left_join(dat_temp, df, by = "SEQN")
+}
+dat_subset <- select(dat_temp, SEQN, SLD010H, SLQ050, SLQ060, RIDAGEYR, RIAGENDR, RIDRETH3, ALQ120Q, BMXBMI, avg_systolic, INDFMMPI, screen_time, PAD680, LBDTCSI, depression_score, depression_category, LBXVIDMS, LBDB12SI)
+colnames(dat_subset) <- new_colnames
+subset_pat<-md.pattern(dat_subset)
+#md.pattern(dat_temp)
+```
+```{r}
+vis_miss(dat_subset)
+```
+```{r}
+dat_subset_missing_indicators <- dat_subset %>%
+  mutate(across(everything(), ~ ifelse(is.na(.), 1, 0), .names = "miss_{col}"))
+
+summary(glm(miss_sleep_trouble ~ BMI, data = dat_subset_missing_indicators, family = binomial))
+```
+```{r}
+dat_subset_missing_indicators <- dat_subset %>%
+  mutate(miss_sleep_trouble = ifelse(is.na(sleep_trouble), 1, 0))
+
+covariate_names <- setdiff(names(dat_subset_missing_indicators), c("sleep_trouble", "miss_sleep_trouble", "ID", "sleep_hours", "miss_sleep_hours", "sleep_diagnosed" ,"miss_sleep_diagnosed", "depression_category"))
+
+results_list <- list()
+
+for (covariate in covariate_names) {
+  formula <- as.formula(paste("miss_sleep_trouble ~", covariate))
+  model <- glm(formula, data = dat_subset_missing_indicators, family = binomial)
+  summary_model <- summary(model)
+  p_value <- summary_model$coefficients[2, 4]  
+  results_list[[covariate]] <- list(
+    estimate = summary_model$coefficients[2, 1],
+    std_error = summary_model$coefficients[2, 2],
+    z_value = summary_model$coefficients[2, 3],
+    p_value = p_value
+  )
+}
+
+results_df <- do.call(rbind, lapply(names(results_list), function(name) {
+  c(covariate = name, results_list[[name]])
+}))
+
+print(results_df)
+
+```
+
+```{r}
+results_df <- as.data.frame(results_df)
+
+results_df$estimate <- as.numeric(results_df$estimate)
+results_df$p_value <- as.numeric(results_df$p_value)
+
+ggplot(results_df, aes(x = estimate, y = -log10(p_value), label = covariate)) +
+  geom_point(aes(color = p_value < 0.05), size = 3) +  
+  geom_text_repel(
+    aes(label = ifelse(p_value < 0.05, covariate, "")),  
+    color = "red",  # Color for significant labels
+    size = 3
+  ) +
+  scale_color_manual(values = c("blue", "red")) +  
+  labs(
+    x = "Coefficient Estimate",
+    y = "-log10(p-value)",
+    title = "Logistic Regression Results for Missingness of sleep_trouble",
+    color = "Significant (p < 0.05)"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+all_covariates_formula <- as.formula(paste("miss_sleep_trouble ~", paste(covariate_names, collapse = " + ")))
+multivariable_model <- glm(all_covariates_formula, data = dat_subset_missing_indicators, family = binomial)
+summary(multivariable_model)
+```
+
+```{r}
+
+imputed_data <- mice(
+  dat_subset,
+  m = 1,              
+  maxit = 10,          
+  method = 'pmm',      
+  delta = 0            
+)
+completed_data <- complete(imputed_data, action = 1)
+write.csv(completed_data, file = "./data/Imputed_Dataset_2013_14.csv", row.names = FALSE)
+
 ```
 
 # Q11
