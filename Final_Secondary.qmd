@@ -1,0 +1,278 @@
+---
+title: "Secondary Question"
+format: pdf
+editor: visual
+---
+
+## Secondary Question
+
+## Import Data
+
+```{r}
+getwd()
+setwd("./data/2020")
+
+ALQ <- read_xpt("P_ALQ.XPT")
+BIOPRO <- read_xpt("P_BIOPRO.XPT")
+BMX <- read_xpt("P_BMX.XPT")
+BPXO <- read_xpt("P_BPXO.XPT")
+DEMO <- read_xpt("P_DEMO.XPT")
+PAQ <- read_xpt("P_PAQ.XPT")
+SLQ <- read_xpt("P_SLQ.XPT")
+TCHOL <- read_xpt("P_TCHOL.XPT")
+DPQ_raw <- read_xpt("P_DPQ.XPT")
+FETIB <- read_xpt("P_FETIB.XPT")
+
+#secondary question datasets
+GLU <- read_xpt("P_GLU.XPT")
+INS <- read_xpt("P_INS.XPT")
+PERNT <- read_xpt("P_PERNT.XPT")
+UIO <- read_xpt("P_UIO.XPT")
+TRIGLY <- read_xpt("P_TRIGLY.XPT")
+TCHOL <- read_xpt("P_TCHOL.XPT")
+HUQ <- read_xpt("P_HUQ.XPT")
+
+DPQ <- DPQ_raw %>%
+    filter(complete.cases(select(., starts_with("DPQ"))[-1])) %>%
+    mutate(depression_score = rowSums(select(., starts_with("DPQ"))[-1])) %>%
+    mutate(depression_category = case_when(
+        depression_score <= 4 ~ "Minimal",
+        depression_score <= 9 ~ "Mild",
+        depression_score <= 14 ~ "Moderate",
+        depression_score <= 19 ~ "Moderately severe",
+        depression_score >= 20 ~ "Severe"
+    ))
+
+datasets <- list(ALQ, BIOPRO, BMX, BPXO, DEMO,  PAQ, SLQ, TCHOL, DPQ)
+test <- reduce(datasets, inner_join, by = "SEQN")  
+
+temp <- select(test, SEQN , BMXBMI, ALQ130, RIAGENDR, RIDRETH1, RIDAGEYR, INDFMPIR, LBXSNASI, LBXSKSI, LBDSCASI, LBXSCLSI, PAD680, depression_score, depression_category)
+
+dat_raw <- left_join(SLQ, temp)
+
+# rename cols
+new_colnames <-  c(
+  "ID",      # SEQN;Respondent_sequence_number
+  "sleep_time_weekdays",       # SLQ300;Usual_sleep_time_weekdays
+  "wake_time_weekdays",        # SLQ310;Usual_wake_time_weekdays
+  "sleep_hours_weekdays",            # SLD012;Sleep_hours_weekdays
+  "sleep_time_weekends",       # SLQ320;Usual_sleep_time_weekends
+  "wake_time_weekends",        # SLQ330;Usual_wake_time_weekends
+  "sleep_hours_weekends",            # SLD013;Sleep_hours_weekends
+  "frq_snore",                 # SLQ030;How_often_snore
+  "frq_snort_or_stop_breathing",# SLQ040;How_often_snort_or_stop_breathing
+  "sleep_trouble",  # SLQ050;Ever_told_doctor_sleep_trouble
+  "overly_sleepy",          # SLQ120;Feel_overly_sleepy_day
+  "BMI",                 # BMXBMI;Body_Mass_Index
+  "alcohol",         # ALQ121;How_often_drink_alcohol
+  "gender",                          # RIAGENDR;Gender
+  "Race_Hispanic_origin",            # RIDRETH1;Race_Hispanic_origin
+  "age",                # RIDAGEYR;Age_at_screening
+  "Family_income_to_poverty_ratio",  # INDFMPIR;Family_income_to_poverty_ratio
+  "Na",                   # LBXSNASI;Sodium_mmol_L
+  "K",                # LBXSLSI;Potassium_mmol_L
+  "Ca",            # LBDSCASI;Total_Calcium_mmol_L
+  "Cl",                 # LBXSCLSI;Chloride_mmol_L
+  "sedentary_activity",       # PAD680;Minutes_sedentary_activity
+  "dp_score",
+  "dp_cate"
+  
+)
+colnames(dat_raw) <- new_colnames
+
+# remove all lines with NA
+dat_raw[dat_raw == ""] <- NA
+dat_clean <- dat_raw |>
+  drop_na() |>
+   filter(alcohol < 16 & frq_snore != 7 & frq_snore != 9 & frq_snort_or_stop_breathing != 7 & frq_snort_or_stop_breathing != 9 & sleep_trouble != 9 & overly_sleepy != 9) |>
+  mutate(across(c(sleep_time_weekdays,wake_time_weekdays,sleep_time_weekends,wake_time_weekends), hm)) |>
+  mutate(across(c(ID,frq_snore,frq_snort_or_stop_breathing,sleep_trouble,overly_sleepy,gender,Race_Hispanic_origin),as.factor)) |>
+  mutate(across(c(,),as.numeric)) |>
+  mutate(sleep_hours_avg = 2/7*sleep_hours_weekends+5/7*sleep_hours_weekdays)
+
+pri_Q <- dat_clean[,c("ID", "sleep_trouble","sleep_hours_avg","BMI","alcohol","gender","Race_Hispanic_origin","age","Family_income_to_poverty_ratio","dp_score","dp_cate")]
+
+
+
+
+```
+
+## Further Data Cleaning for Secondary Questions
+
+```{r}
+
+#cleaning of extra data
+
+GLU <- GLU |> 
+  mutate(ID = as.factor(SEQN)) |> 
+  select(-SEQN)
+
+INS <- INS |> 
+  mutate(ID = as.factor(SEQN))|> 
+  select(-SEQN)
+
+PERNT <- PERNT |> 
+  mutate(ID = as.factor(SEQN))|> 
+  select(-SEQN)
+
+UIO <- UIO |> 
+  mutate(ID = as.factor(SEQN))|> 
+  select(-SEQN)
+
+TRIGLY <- TRIGLY |> 
+  mutate(ID = as.factor(SEQN))|> 
+  select(-SEQN)
+
+HUQ <- HUQ |> 
+  mutate(ID = as.factor(SEQN))|> 
+  select(-SEQN)
+
+BIOPRO2 <- BIOPRO |> 
+  mutate(ID = as.factor(SEQN))|> 
+  select(-SEQN)
+
+TCHOL <- TCHOL |> 
+  mutate(ID = as.factor(SEQN))|> 
+  select(-SEQN)
+
+#combine all datasets
+
+extra_data_list <- list(pri_Q, GLU, INS, PERNT, UIO, TRIGLY, HUQ, TCHOL, BIOPRO2)
+
+combined_dat <- Reduce(function(x, y) left_join(x, y, by = "ID"), extra_data_list)
+
+
+
+```
+
+## Association Analysis for Sleep Hours
+
+```{r}
+
+## Electrolytes
+
+# Sleep hours and phosphorous 
+lm_phs = lm(sleep_hours_avg ~ LBDSPHSI, data = combined_dat)
+summary(lm_phs) #significant
+
+# Sleep hours and sodium
+lm_sod = lm(sleep_hours_avg ~ LBXSNASI, data = combined_dat)
+summary(lm_sod)
+
+# Sleep hours and potassium
+lm_k = lm(sleep_hours_avg ~ LBXSKSI, data = combined_dat)
+summary(lm_k)
+
+# Sleep hours and chloride
+lm_cl = lm(sleep_hours_avg ~ LBXSCLSI, data = combined_dat)
+summary(lm_cl)
+
+# Sleep hours and calcium
+lm_ca = lm(sleep_hours_avg ~ LBDSCASI, data = combined_dat)
+summary(lm_ca)
+
+# Sleep hours and iodine
+lm_iod = lm(sleep_hours_avg ~ URXUIO, data = combined_dat)
+summary(lm_iod)
+
+# Sleep hours and iron
+lm_fe = lm(sleep_hours_avg ~ LBDSIRSI, data = combined_dat)
+summary(lm_fe)
+
+
+## Common Biochemicals
+
+# Sleep hours and insulin
+lm_ins = lm(sleep_hours_avg ~ LBDINSI, data = combined_dat)
+summary(lm_ins)
+
+# Uric Acid
+lm_ura = lm(sleep_hours_avg ~ LBXSUA, data = combined_dat)
+summary(lm_ura) #highly significant
+
+# Blood glucose
+lm_glu = lm(sleep_hours_avg ~ LBDSGLSI, data = combined_dat)
+summary(lm_glu) #significant
+
+# Nitrate
+lm_nit = lm(sleep_hours_avg ~ URXNO3, data = combined_dat)
+summary(lm_nit)
+
+# Total cholesterol
+lm_tch = lm(sleep_hours_avg ~ LBDTCSI, data = combined_dat)
+summary(lm_tch)
+
+## Main covariates from primary analysis
+
+#depression
+lm_dpscore = lm(sleep_hours_avg ~ dp_score, data = combined_dat)
+summary(lm_dpscore)
+
+lm_dpcat = lm(sleep_hours_avg ~ dp_cate, data = combined_dat)
+summary(lm_dpcat)
+
+
+
+```
+
+## Association Analysis for Sleep Disorder
+
+```{r}
+
+## Electrolytes
+
+# Sleep disorders and phosphorous 
+logis_phs = glm(sleep_trouble ~ LBDSPHSI, data = combined_dat, family = "binomial")
+summary(logis_phs) 
+
+# Sleep disorders and sodium
+logis_sod = glm(sleep_trouble ~ LBXSNASI, data = combined_dat, family = "binomial")
+summary(logis_sod) 
+
+
+# Sleep disorders and potassium
+logis_k = glm(sleep_trouble ~ LBXSKSI, data = combined_dat, family = "binomial")
+summary(logis_k) 
+
+
+# Sleep hours and chloride
+logis_cl = glm(sleep_trouble ~ LBXSCLSI, data = combined_dat, family = "binomial")
+summary(logis_cl)  #highly significant
+
+
+# Sleep disorders and calcium
+logis_ca = glm(sleep_trouble ~ LBDSCASI, data = combined_dat, family = "binomial")
+summary(logis_ca) 
+
+# Sleep disorders and iodine
+logis_iod = glm(sleep_trouble ~ URXUIO, data = combined_dat, family = "binomial")
+summary(logis_iod) 
+
+
+# Sleep hours and iron
+logis_fe = glm(sleep_trouble ~ LBDSIRSI, data = combined_dat, family = "binomial")
+summary(logis_fe) 
+
+
+## Common Biochemicals
+
+# Insulin
+logis_ins = glm(sleep_trouble ~ LBDINSI, data = combined_dat, family = "binomial")
+summary(logis_ins) #highly significant
+
+# Uric Acid
+logis_ura = glm(sleep_trouble ~ LBXSUA, data = combined_dat, family = "binomial")
+summary(logis_ura) 
+
+# Blood glucose
+logis_glu = glm(sleep_trouble ~ LBDSGLSI, data = combined_dat, family = "binomial")
+summary(logis_glu) #highly significant
+
+# Nitrate
+logis_nit = glm(sleep_trouble ~ URXNO3, data = combined_dat, family = "binomial")
+summary(logis_nit)
+
+# Total cholesterol
+logis_tch = glm(sleep_trouble ~ LBDTCSI, data = combined_dat, family = "binomial")
+summary(logis_tch) #highly significant
+```
