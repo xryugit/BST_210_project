@@ -57,11 +57,8 @@ VID <- read_xpt("VID_H.XPT")
 VITB12 <- read_xpt("VITB12_H.XPT")
 
 DPQ <- DPQ_raw %>%
-    # Remove rows with any NA in DPQ columns (excluding SEQN)
     filter(complete.cases(select(., starts_with("DPQ"))[-1])) %>%
-    # Calculate total depression score
     mutate(depression_score = rowSums(select(., starts_with("DPQ"))[-1])) %>%
-    # Categorize total depression score into levels
     mutate(depression_category = case_when(
         depression_score <= 4 ~ "Minimal",
         depression_score <= 9 ~ "Mild",
@@ -70,14 +67,12 @@ DPQ <- DPQ_raw %>%
         depression_score >= 20 ~ "Severe"
     ))
 
-# Calculate average systolic and diastolic blood pressure using all four readings
 BPX <- BPX %>%
   mutate(
     avg_systolic = rowMeans(select(., BPXSY1, BPXSY2, BPXSY3, BPXSY4), na.rm = TRUE),
     avg_diastolic = rowMeans(select(., BPXDI1, BPXDI2, BPXDI3, BPXDI4), na.rm = TRUE)
   )
 
-# Add screen time variable to PAQ dataset with custom recoding
 PAQ <- PAQ %>%
   mutate(
     PAQ710 = case_when(
@@ -95,12 +90,6 @@ PAQ <- PAQ %>%
     screen_time = PAQ710 + PAQ715
   )
 
-# View a glimpse of the modified dataset to confirm the changes
-glimpse(PAQ)
-
-
-# View a glimpse of the modified dataset to confirm the changes
-glimpse(BPX)
 
 
 datasets <- list(ALQ, BIOPRO, BMX,BPX, DEMO , PAQ, SLQ, TCHOL, DPQ , INQ, VID, VITB12)
