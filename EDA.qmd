@@ -127,7 +127,11 @@ summary(dat_raw)
 ```{r}
 # rename cols
 new_colnames <- c(
+  
   "ID",                           # SEQN; Respondent sequence number
+  "sleep_hours",            # SLD010H; Usual hours of sleep on weekdays
+  "sleep_trouble",          # SLQ050; Ever told doctor had trouble sleeping?
+  "sleep_diagnosed",        # SLQ060; Ever told by doctor have sleep disorder?
   "age",                          # RIDAGEYR; Age at screening
   "gender",                       # RIAGENDR; Gender
   "race_ethnicity",               # RIDRETH3; Race/Ethnicity category
@@ -138,9 +142,7 @@ new_colnames <- c(
   "screen_time",                   # TV+computer time
   "sedentary_minutes",            # PAD680; Minutes of sedentary activity
   "total_cholesterol",            # LBDTCSI; Total cholesterol (mg/dL)
-  "sleep_hours",            # SLD010H; Usual hours of sleep on weekdays
-  "sleep_trouble",          # SLQ050; Ever told doctor had trouble sleeping?
-  "sleep_diagnosed",        # SLQ060; Ever told by doctor have sleep disorder?
+
   "depression_score",             # depression_score; Calculated total depression score
   "depression_category",          # depression_category; Depression score category
   "vitamin_d",                    # LBXVIDMS; Vitamin D level (nmol/L)
@@ -151,10 +153,11 @@ colnames(dat_raw) <- new_colnames
 dat_raw[dat_raw == ""] <- NA
 dat_clean <- dat_raw |>
   drop_na() |>
-   filter(alcohol > 400 & sleep_trouble != 9 & sedentary_minutes < 3000 & sleep_hours < 66 & sleep_trouble < 3 & sleep_diagnosed <3) |>
-  mutate(across(c(sleep_hours), hm)) |>
-  mutate(across(c(ID,sleep_trouble,sleep_diagnosed,gender,race_ethnicity),as.factor)) 
-  
+  filter(alcohol < 400  & sedentary_minutes < 6000 & sleep_hours < 66 & sleep_trouble < 3 & sleep_diagnosed < 3 & vitamin_b12 <= 2500 & vitamin_d <= 200, total_cholesterol < 20) |>
+  mutate(across(c(ID, sleep_trouble, sleep_diagnosed, gender, race_ethnicity), as.factor))
+
+
+
 
 ```
 
@@ -168,150 +171,205 @@ summary(dat_clean)
 ## Correlations
 
 ```{r}
-par(mfrow = c(1,2))
-scatter.smooth(dat_cleaned$BMI,dat_cleaned$sleep_hours_avg,col = "light blue")
-scatter.smooth(dat_cleaned$age,dat_cleaned$sleep_hours_avg,col = "light blue")
-scatter.smooth(dat_cleaned$Family_income_to_poverty_ratio,dat_cleaned$sleep_hours_avg,col = "light blue")
-scatter.smooth(dat_cleaned$Na,dat_cleaned$sleep_hours_avg,col = "light blue")
-scatter.smooth(dat_cleaned$K,dat_cleaned$sleep_hours_avg,col = "light blue")
-scatter.smooth(dat_cleaned$Ca,dat_cleaned$sleep_hours_avg,col = "light blue")
-scatter.smooth(dat_cleaned$Cl,dat_cleaned$sleep_hours_avg,col = "light blue")
-scatter.smooth(dat_cleaned$sedentary_activity,dat_cleaned$sleep_hours_avg,col = "light blue")
-scatter.smooth(dat_cleaned$dp_score,dat_cleaned$sleep_hours_avg,col = "light blue")
-```
 
-```{r}
-pairs(dat_cleaned$sleep_hours_avg ~ dat_cleaned$BMI + dat_cleaned$age + dat_cleaned$Family_income_to_poverty_ratio + dat_cleaned$sedentary_activity,col = "light blue")
-```
+summary(dat_clean)
 
-```{r}
-# Example for a continuous variable (BMI)
-boxplot(BMI ~ sleep_trouble, data = dat_cleaned, 
-        xlab = "Sleep Trouble (Binary)",
-        ylab = "BMI",
-        main = "BMI vs Sleep Trouble",
-        col = "lightblue")
+numeric_vars <- select(dat_clean, age, BMI, avg_systolic_bp, income, screen_time, sedentary_minutes, total_cholesterol, sleep_hours, depression_score, vitamin_d, vitamin_b12)
 
 
+for (col in colnames(numeric_vars)) {
+  data_range <- range(dat_clean[[col]], na.rm = TRUE)
+  binwidth <- (data_range[2] - data_range[1]) / 30  
+  
+  p <- ggplot(dat_clean, aes_string(x = col)) +
+    geom_histogram(binwidth = binwidth, alpha = 0.7) +
+    labs(title = paste("Distribution of", col), x = col, y = "Frequency") +
+    theme_minimal()
+  print(p)
+}
 
 
-```
+categorical_vars <- select(dat_clean, gender, race_ethnicity, sleep_trouble, sleep_diagnosed, depression_category)
 
-```{r}
-ggplot(dat_cleaned, aes(x = as.factor(gender), fill = as.factor(sleep_trouble))) +
-    geom_bar(position = "dodge") +
-    labs(x = "Gender", y = "Count", fill = "Sleep Trouble") +
-    ggtitle("Gender vs Sleep Trouble")
-```
-
-```{r}
-# Example for an ordinal variable (alcohol)
-boxplot(alcohol ~ sleep_trouble, data = dat_cleaned,
-        xlab = "Sleep Trouble (Binary)",
-        ylab = "Alcohol Frequency",
-        main = "Alcohol Frequency vs Sleep Trouble",
-        col = "lightblue")
-
-```
-
-```{r}
-# Define the list of continuous covariates
-continuous_covariates <- c("BMI", "Family_income_to_poverty_ratio", "Na", "K", "Ca", "Cl", "sedentary_activity", "dp_score")
-
-# Loop through each covariate and generate a density plot
-
-for (covariate in continuous_covariates) {
-    # Create the density plot
-    p <- ggplot(dat_cleaned, aes_string(x = covariate, fill = "factor(sleep_trouble)")) +
-        geom_density(alpha = 0.5) +
-        labs(x = covariate, fill = "Sleep Trouble") +
-        ggtitle(paste("Density Plot of", covariate, "by Sleep Trouble")) +
-        theme_minimal()
-    
-    # Print the plot
-    print(p)
+for (col in colnames(categorical_vars)) {
+  p <- ggplot(dat_clean, aes_string(x = col)) +
+    geom_bar( alpha = 0.7) +
+    labs(title = paste("Distribution of", col), x = col, y = "Count") +
+    theme_minimal() +
+    scale_x_discrete(drop = FALSE)  
+  print(p)
 }
 
 
 ```
 
 ```{r}
-# Define the list of categorical covariates
-categorical_covariates <- c("gender", "Race_Hispanic_origin", "alcohol", "dp_cate" )
-
-# Loop through each categorical covariate and generate a bar plot
-
-for (covariate in categorical_covariates) {
-    # Create the bar plot
-    p <- ggplot(dat_cleaned, aes_string(x = covariate, fill = "as.factor(sleep_trouble)")) +
-        geom_bar(position = "dodge") +
-        labs(x = covariate, fill = "Sleep Trouble") +
-        ggtitle(paste("Bar Plot of", covariate, "by Sleep Trouble")) +
-        theme_minimal()
-    
-    # Print the plot
+for (col in colnames(numeric_vars)) {
+  if (col != "depression_score") {
+    p <- ggplot(dat_clean, aes_string(x = col, y = "depression_score")) +
+      geom_point(alpha = 0.5) +
+      geom_smooth(method = "lm", col = "red", se = FALSE) +
+      labs(title = paste("Scatter Plot of", col, "vs Depression Score"), x = col, y = "Depression Score") +
+      theme_minimal()
     print(p)
+  }
 }
 
-```
-
-```{r}
-# Define the list of continuous covariates
-continuous_covariates <- c("BMI", "Family_income_to_poverty_ratio", "Na", "K", "Ca", "Cl", "sedentary_activity", "dp_score")
-
-# Loop through each continuous covariate and generate a boxplot
-
-for (covariate in continuous_covariates) {
-    # Create the boxplot
-    p <- ggplot(dat_cleaned, aes_string(x = "factor(sleep_trouble)", y = covariate, fill = "factor(sleep_trouble)")) +
-        geom_boxplot() +
-        labs(x = "Sleep Trouble", y = covariate, fill = "Sleep Trouble") +
-        ggtitle(paste("Boxplot of", covariate, "by Sleep Trouble")) +
-        theme_minimal()
-    
-    # Print the plot
+for (col in colnames(categorical_vars)) {
+  if (col != "depression_category") {
+    p <- ggplot(dat_clean, aes_string(x = col, y = "depression_score")) +
+      geom_boxplot(fill = "purple", alpha = 0.7) +
+      labs(title = paste("Box Plot of", col, "vs Depression Score"), x = col, y = "Depression Score") +
+      theme_minimal()
     print(p)
+  }
 }
 
-```
+for (col in colnames(categorical_vars)) {
+  if (col != "depression_category") {
+    p <- ggplot(dat_clean, aes_string(x = col, fill = "depression_category")) +
+      geom_bar(position = "fill") +
+      labs(title = paste("Distribution of", col, "by Depression Category"), x = col, y = "Proportion") +
+      theme_minimal()
+    print(p)
+  }
+}
 
-```{r}
-f1 <- sleep_trouble ~ dp_cate
-simple_model <- glm(f1, data= dat_cleaned, family= binomial)
-summary(simple_model)
-```
-
-```{r}
-f2 <- sleep_trouble ~ BMI + alcohol + gender + Race_Hispanic_origin + 
-           age + Family_income_to_poverty_ratio +  sedentary_activity + dp_cate
-mod2 <- glm(f2, data= dat_cleaned, family= binomial)
-summary(mod2)
-```
-
-```{r}
-# Define the formula for logistic regression with all covariates
-formula <- sleep_trouble ~ BMI + alcohol + gender + Race_Hispanic_origin + 
-           age + Family_income_to_poverty_ratio + Na + K + Ca + Cl + sedentary_activity + dp_cate
-
-# Fit the logistic regression model
-logistic_model <- glm(formula, data = dat_cleaned, family = binomial)
-
-# Display the model summary
-summary(logistic_model)
 
 ```
 
 ```{r}
-# Define the formula for logistic regression with all covariates
-formula <- as.numeric(sleep_trouble) ~ BMI + alcohol + gender + Race_Hispanic_origin + 
-           age + Family_income_to_poverty_ratio + Na + K + Ca + Cl + sedentary_activity + dp_cate
+for (col in colnames(numeric_vars)) {
+  if (col != "depression_score") {
+    p <- ggplot(dat_clean, aes_string(x = col, y = "depression_score")) +
+      geom_point(alpha = 0.5) +
+      geom_smooth(method = "lm", col = "red", se = FALSE) +
+      labs(title = paste("Scatter Plot of", col, "vs Depression Score"), x = col, y = "Depression Score") +
+      theme_minimal()
+    print(p)
+  }
+}
 
-# Fit the logistic regression model
-linear_model <- lm(formula, data = dat_cleaned)
+for (col in colnames(categorical_vars)) {
+  if (col != "depression_score") {
+    p <- ggplot(dat_clean, aes_string(x = col, y = "depression_score")) +
+      geom_boxplot(fill = "purple", alpha = 0.7) +
+      labs(title = paste("Box Plot of", col, "vs Depression Score"), x = col, y = "Depression Score") +
+      theme_minimal()
+    print(p)
+  }
+}
 
-# Display the model summary
-summary(linear_model)
+for (col in colnames(categorical_vars)) {
+  if (col != "depression_score") {
+    p <- ggplot(dat_clean, aes_string(x = col, fill = "depression_category")) +
+      geom_bar(position = "fill") +
+      labs(title = paste("Distribution of", col, "by Depression Category"), x = col, y = "Proportion") +
+      theme_minimal()
+    print(p)
+  }
+}
+```
 
+```{r}
+for (col in colnames(numeric_vars)) {
+  p <- ggplot(dat_clean, aes_string(x = "sleep_trouble", y = col)) +
+    geom_boxplot(fill = "purple", alpha = 0.7) +
+    labs(title = paste("Box Plot of", col, "vs Sleep Trouble"), x = "Sleep Trouble", y = col) +
+    theme_minimal()
+  print(p)
+}
+
+
+for (col in colnames(categorical_vars)) {
+  if (col != "sleep_trouble") {
+    p <- ggplot(dat_clean, aes_string(x = col, fill = "sleep_trouble")) +
+      geom_bar(position = "fill") +
+      labs(title = paste("Distribution of", col, "by Sleep Trouble"), x = col, y = "Proportion") +
+      theme_minimal() +
+      scale_fill_discrete(drop = FALSE)  # Ensure all levels of sleep_trouble are represented
+    print(p)
+  }
+}
+```
+
+```{r}
+
+for (col in colnames(numeric_vars)) {
+  p <- ggplot(dat_clean, aes_string(x = "sleep_diagnosed", y = col)) +
+    geom_boxplot(fill = "orange", alpha = 0.7) +
+    labs(title = paste("Box Plot of", col, "vs Sleep Diagnosed"), x = "Sleep Diagnosed", y = col) +
+    theme_minimal()
+  print(p)
+}
+
+for (col in colnames(categorical_vars)) {
+  if (col != "sleep_diagnosed") {
+    p <- ggplot(dat_clean, aes_string(x = col, fill = "sleep_diagnosed")) +
+      geom_bar(position = "fill") +
+      labs(title = paste("Distribution of", col, "by Sleep Diagnosed"), x = col, y = "Proportion") +
+      theme_minimal() +
+      scale_fill_discrete(drop = FALSE)
+    print(p)
+  }
+}
+```
+
+```{r}
+for (col in colnames(numeric_vars)) {
+  if (col != "sleep_hours") {
+    p <- ggplot(dat_clean, aes_string(x = col, y = "sleep_hours")) +
+      geom_point(alpha = 0.5) +
+      geom_smooth(method = "lm", col = "red", se = FALSE) +
+      labs(title = paste("Scatter Plot of", col, "vs Sleep Hours"), x = col, y = "Sleep Hours") +
+      theme_minimal()
+    print(p)
+  }
+}
+
+for (col in colnames(categorical_vars)) {
+  p <- ggplot(dat_clean, aes_string(x = col, y = "sleep_hours")) +
+    geom_boxplot(fill = "cyan", alpha = 0.7) +
+    labs(title = paste("Box Plot of", col, "vs Sleep Hours"), x = col, y = "Sleep Hours") +
+    theme_minimal()
+  print(p)
+}
+```
+
+```{r}
+ggplot(dat_clean, aes(x = sleep_trouble, fill = sleep_diagnosed)) +
+  geom_bar(position = "dodge", alpha = 0.8) +
+  labs(
+    title = "Relationship between Sleep Trouble (Self-Reported) and Sleep Diagnosed (By Doctor)",
+    x = "Told Doctor They Had Sleep Trouble",
+    y = "Count",
+    fill = "Diagnosed by Doctor"
+  ) +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Set1")
+```
+
+```{r}
+ggplot(dat_clean, aes(x = sleep_trouble, y = sleep_hours)) +
+  geom_boxplot(fill = "skyblue", alpha = 0.7) +
+  labs(
+    title = "Relationship between Sleep Trouble (Self-Reported) and Sleep Hours",
+    x = "Sleep Trouble (Self-Reported)",
+    y = "Usual Sleep Hours"
+  ) +
+  theme_minimal()
+```
+
+
+```{r}
+ggplot(dat_clean, aes(x = sleep_diagnosed, y = sleep_hours)) +
+  geom_boxplot(fill = "skyblue", alpha = 0.7) +
+  labs(
+    title = "Relationship between Sleep Diagnosed and Sleep Hours",
+    x = "Sleep Trouble (Self-Reported)",
+    y = "Usual Sleep Hours"
+  ) +
+  theme_minimal()
 ```
 
 # Q11
