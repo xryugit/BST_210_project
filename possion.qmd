@@ -1,0 +1,92 @@
+---
+title: "BST210_project_possion"
+format: pdf
+editor: visual
+---
+
+```{r}
+getwd()
+setwd("./data/2020")
+
+ALQ <- read_xpt("P_ALQ.XPT")
+BIOPRO <- read_xpt("P_BIOPRO.XPT")
+BMX <- read_xpt("P_BMX.XPT")
+BPXO <- read_xpt("P_BPXO.XPT")
+DEMO <- read_xpt("P_DEMO.XPT")
+#FOLATE <- read_xpt("P_FOLATE.XPT")
+PAQ <- read_xpt("P_PAQ.XPT")
+SLQ <- read_xpt("P_SLQ.XPT")
+TCHOL <- read_xpt("P_TCHOL.XPT")
+DPQ_raw <- read_xpt("P_DPQ.XPT")
+FETIB <- read_xpt("P_FETIB.XPT")
+
+DPQ <- DPQ_raw %>%
+    filter(complete.cases(select(., starts_with("DPQ"))[-1])) %>%
+    mutate(depression_score = rowSums(select(., starts_with("DPQ"))[-1])) %>%
+    mutate(depression_category = case_when(
+        depression_score <= 4 ~ "Minimal",
+        depression_score <= 9 ~ "Mild",
+        depression_score <= 14 ~ "Moderate",
+        depression_score <= 19 ~ "Moderately severe",
+        depression_score >= 20 ~ "Severe"
+    ))
+
+
+datasets <- list(ALQ, BIOPRO, BMX, BPXO, DEMO,  PAQ, SLQ, TCHOL, DPQ)
+test <- reduce(datasets, inner_join, by = "SEQN")  
+
+
+temp <- select(test, SEQN , BMXBMI, ALQ130, RIAGENDR, RIDRETH1, RIDAGEYR, INDFMPIR, PAD680, depression_score, depression_category)
+
+dat_raw <- left_join(SLQ, temp)
+
+# rename cols
+new_colnames <-  c(
+  "ID",      # SEQN;Respondent_sequence_number
+  "sleep_time_weekdays",       # SLQ300;Usual_sleep_time_weekdays
+  "wake_time_weekdays",        # SLQ310;Usual_wake_time_weekdays
+  "sleep_hours_weekdays",            # SLD012;Sleep_hours_weekdays
+  "sleep_time_weekends",       # SLQ320;Usual_sleep_time_weekends
+  "wake_time_weekends",        # SLQ330;Usual_wake_time_weekends
+  "sleep_hours_weekends",            # SLD013;Sleep_hours_weekends
+  "frq_snore",                 # SLQ030;How_often_snore
+  "frq_snort_or_stop_breathing",# SLQ040;How_often_snort_or_stop_breathing
+  "sleep_trouble",  # SLQ050;Ever_told_doctor_sleep_trouble
+  "overly_sleepy",          # SLQ120;Feel_overly_sleepy_day
+  "BMI",                 # BMXBMI;Body_Mass_Index
+  "alcohol",         # ALQ121;How_often_drink_alcohol
+  "gender",                          # RIAGENDR;Gender
+  "Race_Hispanic_origin",            # RIDRETH1;Race_Hispanic_origin
+  "age",                # RIDAGEYR;Age_at_screening
+  "Family_income_to_poverty_ratio",  # INDFMPIR;Family_income_to_poverty_ratio
+  "sedentary_activity",       # PAD680;Minutes_sedentary_activity
+  "dp_score",
+  "dp_cate"
+  
+)
+colnames(dat_raw) <- new_colnames
+# remove all lines with NA
+dat_raw[dat_raw == ""] <- NA
+dat_clean <- dat_raw |>
+  drop_na() |>
+   filter(alcohol < 16 & frq_snore != 7 & frq_snore != 9 & frq_snort_or_stop_breathing != 7 & frq_snort_or_stop_breathing != 9 & sleep_trouble != 9 & overly_sleepy != 9) |>
+  mutate(across(c(sleep_time_weekdays,wake_time_weekdays,sleep_time_weekends,wake_time_weekends), hm)) |>
+  mutate(across(c(ID,frq_snore,frq_snort_or_stop_breathing,sleep_trouble,overly_sleepy,gender,Race_Hispanic_origin),as.factor)) |>
+  mutate(across(c(,),as.numeric)) |>
+  mutate(sleep_hours_avg = 2/7*sleep_hours_weekends+5/7*sleep_hours_weekdays) |>
+  mutate(ifelse(as.numeric(sleep_trouble) == 2, 0,1))
+
+
+pri_Q <- dat_clean[,c("sleep_hours_weekdays","BMI","alcohol","gender","Race_Hispanic_origin","age","Family_income_to_poverty_ratio","dp_score","dp_cate")]
+
+```
+
+```{r}
+unique(pri_Q$sleep_hours_weekdays)
+```
+
+```{r}
+glm_pois_full <- glm(sleep_hours_weekdays ~ ., data=pri_Q, family = poisson)
+summary(glm_pois_full)
+```
+

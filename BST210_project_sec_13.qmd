@@ -119,6 +119,7 @@ dat_clean <- dat_raw |>
 
 
 pri_Q <- dat_clean[,c("sleep_trouble","BMI","alcohol","gender","race_ethnicity","age","income","depression_score","depression_category")]
+pri_Q$sleep_trouble <- ifelse(dat_clean$sleep_trouble == "2",0,1)
 ```
 
 ```{r}
@@ -210,6 +211,7 @@ mod4 <- update(mod3,. ~ .+ I(alcohol^2))
 coef(summary(mod4))["I(alcohol^2)", "Pr(>|z|)"]
 mod4 <- update(mod3,. ~ .+ I(income^2))
 coef(summary(mod4))["I(income^2)", "Pr(>|z|)"]
+summary(mod3)
 ```
 
 ```{r}

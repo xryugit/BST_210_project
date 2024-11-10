@@ -51,7 +51,7 @@ datasets <- list(ALQ, BIOPRO, BMX, BPXO, DEMO,  PAQ, SLQ, TCHOL, DPQ)
 test <- reduce(datasets, inner_join, by = "SEQN")  
 
 
-temp <- select(test, SEQN , BMXBMI, ALQ130, RIAGENDR, RIDRETH1, RIDAGEYR, INDFMPIR, LBXSNASI, LBXSKSI, LBDSCASI, LBXSCLSI, PAD680, depression_score, depression_category)
+temp <- select(test, SEQN , BMXBMI, ALQ130, RIAGENDR, RIDRETH1, RIDAGEYR, INDFMPIR, PAD680, depression_score, depression_category)
 
 dat_raw <- left_join(SLQ, temp)
 
@@ -74,10 +74,6 @@ new_colnames <-  c(
   "Race_Hispanic_origin",            # RIDRETH1;Race_Hispanic_origin
   "age",                # RIDAGEYR;Age_at_screening
   "Family_income_to_poverty_ratio",  # INDFMPIR;Family_income_to_poverty_ratio
-  "Na",                   # LBXSNASI;Sodium_mmol_L
-  "K",                # LBXSLSI;Potassium_mmol_L
-  "Ca",            # LBDSCASI;Total_Calcium_mmol_L
-  "Cl",                 # LBXSCLSI;Chloride_mmol_L
   "sedentary_activity",       # PAD680;Minutes_sedentary_activity
   "dp_score",
   "dp_cate"
@@ -92,9 +88,12 @@ dat_clean <- dat_raw |>
   mutate(across(c(sleep_time_weekdays,wake_time_weekdays,sleep_time_weekends,wake_time_weekends), hm)) |>
   mutate(across(c(ID,frq_snore,frq_snort_or_stop_breathing,sleep_trouble,overly_sleepy,gender,Race_Hispanic_origin),as.factor)) |>
   mutate(across(c(,),as.numeric)) |>
-  mutate(sleep_hours_avg = 2/7*sleep_hours_weekends+5/7*sleep_hours_weekdays)
+  mutate(sleep_hours_avg = 2/7*sleep_hours_weekends+5/7*sleep_hours_weekdays) |>
+  mutate(ifelse(as.numeric(sleep_trouble) == 2, 0,1))
+
 
 pri_Q <- dat_clean[,c("sleep_trouble","BMI","alcohol","gender","Race_Hispanic_origin","age","Family_income_to_poverty_ratio","dp_score","dp_cate")]
+pri_Q$sleep_trouble <- ifelse(dat_clean$sleep_trouble == "2",0,1)
 ```
 ```{r}
 cate <- glm(sleep_trouble ~ as.factor(dp_cate), data = pri_Q, family = "binomial")
@@ -185,7 +184,14 @@ mod4 <- update(mod3,. ~ .+ I(alcohol^2))
 coef(summary(mod4))["I(alcohol^2)", "Pr(>|z|)"]
 mod4 <- update(mod3,. ~ .+ I(Family_income_to_poverty_ratio^2))
 coef(summary(mod4))["I(Family_income_to_poverty_ratio^2)", "Pr(>|z|)"]
+summary(mod3)
 ```
+
+$$
+\log\left(\frac{p_{sleep~disorder}}{1-p_{sleep~disorder}}\right) = \beta_{k,0} + \beta_{k,1} depression_{i} + \beta_{k,2} BMI _{i} + \beta_{k,3} alcohol_{i} + \beta_{k,4} Race_{i} + \beta_{k,5} age_{i} + \beta_{k,6} age^2_{i}+ \beta_{k,7} income_{i}
+$$
+
+
 
 ```{r}
 par(mfrow=c(1,1))
@@ -215,6 +221,12 @@ auc(roccurve)
 ```
 
 
+The odds of ever having sleep trouble is estimated to be exp(0.1434) = 1.1542 times the odds of ever having sleep trouble among poeple with a one-unit higher depression score on average, holding other covariates constant, according to these sample data. 
+
+
+```{r}
+
+```
 
 
 
