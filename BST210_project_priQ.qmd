@@ -18,7 +18,6 @@ library(car)
 ```
 
 ### Form Dataset
-
 ```{r}
 getwd()
 setwd("./data/2020")
@@ -35,9 +34,9 @@ TCHOL <- read_xpt("P_TCHOL.XPT")
 DPQ_raw <- read_xpt("P_DPQ.XPT")
 FETIB <- read_xpt("P_FETIB.XPT")
 
-DPQ <- DPQ_raw %>%
-    filter(complete.cases(select(., starts_with("DPQ"))[-1])) %>%
-    mutate(depression_score = rowSums(select(., starts_with("DPQ"))[-1])) %>%
+DPQ <- DPQ_raw %>% 
+    filter(complete.cases(select(., starts_with("DPQ"))[-1])) %>% 
+    mutate(depression_score = rowSums(select(., starts_with("DPQ"))[-1])) |> #%>% 
     mutate(depression_category = case_when(
         depression_score <= 4 ~ "Minimal",
         depression_score <= 9 ~ "Mild",
@@ -46,18 +45,21 @@ DPQ <- DPQ_raw %>%
         depression_score >= 20 ~ "Severe"
     ))
 
-
+BPXO <- BPXO %>%
+  mutate(
+    MAP1 = (1 / 3) * BPXOSY1 + (2 / 3) * BPXODI1,
+    MAP2 = (1 / 3) * BPXOSY2 + (2 / 3) * BPXODI2,
+    MAP3 = (1 / 3) * BPXOSY3 + (2 / 3) * BPXODI3,
+    avg_MAP = rowMeans(cbind(MAP1, MAP2, MAP3), na.rm = TRUE)
+  )
 datasets <- list(ALQ, BIOPRO, BMX, BPXO, DEMO,  PAQ, SLQ, TCHOL, DPQ)
-test <- reduce(datasets, inner_join, by = "SEQN")  
-
-
-temp <- select(test, SEQN , BMXBMI, ALQ130, RIAGENDR, RIDRETH1, RIDAGEYR, INDFMPIR, PAD680, depression_score, depression_category)
+test <- reduce(datasets, inner_join, by = "SEQN")
+temp <- select(test, SEQN , BMXBMI, avg_MAP, ALQ130, RIAGENDR, RIDRETH1, RIDAGEYR, INDFMPIR, PAD680, LBDTCSI, depression_score, depression_category)
 
 dat_raw <- left_join(SLQ, temp)
 
-# rename cols
 new_colnames <-  c(
-  "ID",      # SEQN;Respondent_sequence_number
+  "ID",                          # SEQN; Respondent sequence number
   "sleep_time_weekdays",       # SLQ300;Usual_sleep_time_weekdays
   "wake_time_weekdays",        # SLQ310;Usual_wake_time_weekdays
   "sleep_hours_weekdays",            # SLD012;Sleep_hours_weekdays
@@ -68,19 +70,20 @@ new_colnames <-  c(
   "frq_snort_or_stop_breathing",# SLQ040;How_often_snort_or_stop_breathing
   "sleep_trouble",  # SLQ050;Ever_told_doctor_sleep_trouble
   "overly_sleepy",          # SLQ120;Feel_overly_sleepy_day
-  "BMI",                 # BMXBMI;Body_Mass_Index
-  "alcohol",         # ALQ121;How_often_drink_alcohol
-  "gender",                          # RIAGENDR;Gender
-  "Race_Hispanic_origin",            # RIDRETH1;Race_Hispanic_origin
-  "age",                # RIDAGEYR;Age_at_screening
-  "Family_income_to_poverty_ratio",  # INDFMPIR;Family_income_to_poverty_ratio
-  "sedentary_activity",       # PAD680;Minutes_sedentary_activity
-  "dp_score",
-  "dp_cate"
-  
+  "BMI",                         # BMXBMI; Body Mass Index
+  "avg_MAP",                     # avg_MAP; Average Mean Arterial Pressure
+  "alcohol",                     # ALQ130; How often drink alcohol
+  "gender",                      # RIAGENDR; Gender
+  "Race_Hispanic_origin",        # RIDRETH1; Race/Hispanic origin
+  "age",                         # RIDAGEYR; Age at screening
+  "Family_income_to_poverty_ratio",  # INDFMPIR; Family income to poverty ratio
+  "sedentary_activity",          # PAD680; Minutes sedentary activity
+  "total_cholesterol",           # LBDTCSI; Total cholesterol mmol/L
+  "depression_score",            # depression_score; Depression score
+  "depression_category"          # depression_category; Depression category
 )
 colnames(dat_raw) <- new_colnames
-# remove all lines with NA
+#remove all lines with NA
 dat_raw[dat_raw == ""] <- NA
 dat_clean <- dat_raw |>
   drop_na() |>
@@ -88,31 +91,32 @@ dat_clean <- dat_raw |>
   mutate(across(c(sleep_time_weekdays,wake_time_weekdays,sleep_time_weekends,wake_time_weekends), hm)) |>
   mutate(across(c(ID,frq_snore,frq_snort_or_stop_breathing,sleep_trouble,overly_sleepy,gender,Race_Hispanic_origin),as.factor)) |>
   mutate(across(c(,),as.numeric)) |>
-  mutate(sleep_hours_avg = 2/7*sleep_hours_weekends+5/7*sleep_hours_weekdays) |>
-  mutate(ifelse(as.numeric(sleep_trouble) == 2, 0,1))
+  mutate(sleep_hours_avg = 2/7*sleep_hours_weekends+5/7*sleep_hours_weekdays)
+```
 
-
-pri_Q <- dat_clean[,c("sleep_trouble","BMI","alcohol","gender","Race_Hispanic_origin","age","Family_income_to_poverty_ratio","dp_score","dp_cate")]
+```{r}
+pri_Q <- dat_clean[,c("sleep_trouble","BMI","avg_MAP","total_cholesterol","alcohol","gender","Race_Hispanic_origin","age","Family_income_to_poverty_ratio","depression_score","depression_category")]
 pri_Q$sleep_trouble <- ifelse(dat_clean$sleep_trouble == "2",0,1)
 ```
+
 ```{r}
-cate <- glm(sleep_trouble ~ as.factor(dp_cate), data = pri_Q, family = "binomial")
-conti <- glm(sleep_trouble ~ dp_score, data = pri_Q, family = "binomial")
+cate <- glm(sleep_trouble ~ as.factor(depression_category), data = pri_Q, family = "binomial")
+conti <- glm(sleep_trouble ~ depression_score, data = pri_Q, family = "binomial")
 summary(cate)
 summary(conti)
 anova(cate, conti, test="Chisq")
 pri_Q <- pri_Q |>
-  select(-dp_cate)
+  select(-depression_category)
 ```
 
 ```{r}
-full_model <- glm(sleep_trouble ~ BMI+alcohol+gender+Race_Hispanic_origin+age+Family_income_to_poverty_ratio+dp_score,data = pri_Q, family = "binomial")
+full_model <- glm(sleep_trouble ~ BMI+alcohol+gender+Race_Hispanic_origin+age+Family_income_to_poverty_ratio+depression_score+avg_MAP+total_cholesterol,data = pri_Q, family = "binomial")
 vif(full_model)
 ```
 ```{r}
-plot(conti$fitted.values~pri_Q$dp_score,type='p',
+plot(conti$fitted.values~pri_Q$depression_score,type='p',
      col='black',ylab="P(sleep~disorder)",xlab="age")
-lines(cate$fitted.values~pri_Q$dp_score,type='p',
+lines(cate$fitted.values~pri_Q$depression_score,type='p',
       col="red")
 legend('bottomright',legend=c("linear","ordinal"),
        pch=c(1,1),col=c(1,2))
@@ -126,7 +130,7 @@ x <- model.matrix(sleep_trouble~., data=pri_Q)[,-c(1)]
 y <- pri_Q$sleep_trouble
 for (i in seq(0,1,0.1)) {
   names(x)<- c("BMI","age","gender","Race_Hispanic_origin",
-               "Family_income_to_poverty_ratio","dp_score","alcohol")
+               "Family_income_to_poverty_ratio","depression_score","alcohol")
   EN.fram = glmnet(x,y, alpha=0.5, family="binomial",
                    lambda=lambda_grid, data=pri_Q)
   cv.EN <- cv.glmnet(x,y, alpha=0.5, family="binomial", data=pri_Q)
@@ -150,25 +154,29 @@ $$
 
 BMI, alcohol, gender, Race_Hispanic_origin, age, and Family_income_to_poverty_ratio appear to satisfy the causal definition of a confounder
 ```{r}
-mod2 <- glm(sleep_trouble ~ BMI+alcohol+gender+Race_Hispanic_origin+age+Family_income_to_poverty_ratio+dp_score,data = pri_Q, family = "binomial")
+mod2 <- glm(sleep_trouble ~ BMI+alcohol+gender+Race_Hispanic_origin+age+Family_income_to_poverty_ratio+depression_score+avg_MAP,data = pri_Q, family = "binomial")
 summary(mod2)
 ```
 
 ### potential effect modifier
 
 ```{r}
-mod3 <- update(mod2,. ~ .+dp_score*BMI)
-coef(summary(mod3))["BMI:dp_score", "Pr(>|z|)"]
-mod3 <- update(mod2,. ~ .+dp_score*alcohol)
-coef(summary(mod3))["alcohol:dp_score", "Pr(>|z|)"]
-mod3 <- update(mod2,. ~ .+dp_score*gender)
-coef(summary(mod3))["gender2:dp_score", "Pr(>|z|)"]
-mod3 <- update(mod2,. ~ .+dp_score*Race_Hispanic_origin)
+mod3 <- update(mod2,. ~ .+depression_score*BMI)
+coef(summary(mod3))["BMI:depression_score", "Pr(>|z|)"]
+mod3 <- update(mod2,. ~ .+depression_score*alcohol)
+coef(summary(mod3))["alcohol:depression_score", "Pr(>|z|)"]
+mod3 <- update(mod2,. ~ .+depression_score*gender)
+coef(summary(mod3))["gender2:depression_score", "Pr(>|z|)"]
+mod3 <- update(mod2,. ~ .+depression_score*Race_Hispanic_origin)
 summary(mod3)
-mod3 <- update(mod2,. ~ .+dp_score*age)
-coef(summary(mod3))["age:dp_score", "Pr(>|z|)"]
-mod3 <- update(mod2,. ~ .+dp_score*Family_income_to_poverty_ratio)
+mod3 <- update(mod2,. ~ .+depression_score*age)
+coef(summary(mod3))["age:depression_score", "Pr(>|z|)"]
+mod3 <- update(mod2,. ~ .+depression_score*Family_income_to_poverty_ratio)
 summary(mod3)
+mod3 <- update(mod2,. ~ .+depression_score*avg_MAP)
+coef(summary(mod3))["depression_score:avg_MAP", "Pr(>|z|)"]
+mod3 <- update(mod2,. ~ .+depression_score*total_cholesterol)
+coef(summary(mod3))["depression_score:total_cholesterol", "Pr(>|z|)"]
 ```
 
 ### Assess possible nonlinear effect of BMI, alcohol, Family_income_to_poverty_ratio, and age
@@ -184,11 +192,14 @@ mod4 <- update(mod3,. ~ .+ I(alcohol^2))
 coef(summary(mod4))["I(alcohol^2)", "Pr(>|z|)"]
 mod4 <- update(mod3,. ~ .+ I(Family_income_to_poverty_ratio^2))
 coef(summary(mod4))["I(Family_income_to_poverty_ratio^2)", "Pr(>|z|)"]
-summary(mod3)
+mod4 <- update(mod3,. ~ .+I(avg_MAP^2))
+coef(summary(mod4))["I(avg_MAP^2)", "Pr(>|z|)"]
+mod4 <- update(mod3,. ~ .+I(total_cholesterol^2))
+coef(summary(mod4))["I(total_cholesterol^2)", "Pr(>|z|)"]
 ```
 
 $$
-\log\left(\frac{p_{sleep~disorder}}{1-p_{sleep~disorder}}\right) = \beta_{k,0} + \beta_{k,1} depression_{i} + \beta_{k,2} BMI _{i} + \beta_{k,3} alcohol_{i} + \beta_{k,4} Race_{i} + \beta_{k,5} age_{i} + \beta_{k,6} age^2_{i}+ \beta_{k,7} income_{i}
+\log\left(\frac{p_{sleep~disorder}}{1-p_{sleep~disorder}}\right) = \beta_{k,0} + \beta_{k,1} depression_{i} + \beta_{k,2} BMI _{i} + \beta_{k,3} alcohol_{i} + \beta_{k,4} Race_{i} + \beta_{k,5} age_{i} + \beta_{k,6} age^2_{i}+ \beta_{k,7} income_{i} + \beta_{k,8} \text{avg_MAP}_{i} + \beta_{k,9} \text{total_cholesterol}_{i}
 $$
 
 
@@ -207,7 +218,7 @@ Hosmer-Lemeshow test because we have a larger number of covariate patterns.
 library(ResourceSelection)
 options(digits=7)
 # Hosmer-Lemeshow Test
-hoslem.test(mod4$y,fitted(mod3),g=10)
+hoslem.test(mod3$y,fitted(mod3),g=10)
 ```
 
 ### ROC
@@ -221,7 +232,7 @@ auc(roccurve)
 ```
 
 
-The odds of ever having sleep trouble is estimated to be exp(0.1434) = 1.1542 times the odds of ever having sleep trouble among poeple with a one-unit higher depression score on average, holding other covariates constant, according to these sample data. 
+The odds of ever having sleep trouble is estimated to be exp(0.1377799) = 1.147723 times the odds of ever having sleep trouble among poeple with a one-unit higher depression score on average, holding other covariates constant, according to these sample data. 
 
 
 ```{r}
