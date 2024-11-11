@@ -148,6 +148,7 @@ combined_dat <- Reduce(function(x, y) left_join(x, y, by = "ID"), extra_data_lis
 ## Association Analysis for Sleep Hours
 
 ```{r}
+library(glmnet)
 
 ## Electrolytes
 
@@ -211,6 +212,68 @@ summary(lm_dpscore)
 lm_dpcat = lm(sleep_hours_avg ~ dp_cate, data = combined_dat)
 summary(lm_dpcat)
 
+
+## Stepwise Model Selection
+
+filtered_dat <- combined_dat %>% 
+  filter(!is.na(sleep_hours_avg) & 
+           !is.na(LBDSPHSI) & !is.na(LBXSNASI) & !is.na(LBXSKSI) & 
+           !is.na(LBXSCLSI) & !is.na(LBDSCASI) & !is.na(URXUIO) & 
+           !is.na(LBDSIRSI) & !is.na(LBDINSI) & !is.na(LBXSUA) & 
+           !is.na(LBDSGLSI) & !is.na(URXNO3) & !is.na(LBDTCSI) & 
+           !is.na(dp_score) & !is.na(dp_cate))
+
+
+lm_step <- lm(sleep_hours_avg ~ LBDSPHSI + LBXSNASI + LBXSKSI + LBXSCLSI + LBDSCASI +
+                URXUIO + LBDSIRSI + LBDINSI + LBXSUA + LBDSGLSI + URXNO3 + LBDTCSI +
+                dp_score + dp_cate, data=filtered_dat)
+summary(lm_step)
+stepModel <- step(lm_step, direction=c("both"))
+summary(stepModel)
+plot(fitted(stepModel), residuals(stepModel))
+abline(a=0,b=0,col="pink")
+
+qqnorm(residuals(stepModel)) 
+qqline(residuals(stepModel),col="pink")
+
+# Elastic Net
+x <- as.matrix(combined_dat[, c("LBDSPHSI", "LBXSNASI", "LBXSKSI", "LBXSCLSI", 
+                            "LBDSCASI", "LBDSIRSI", 
+                            "LBXSUA", "LBDSGLSI", "LBDTCSI", 
+                            "dp_score", "dp_cate", 'BMI', 'gender','Race_Hispanic_origin','Family_income_to_poverty_ratio', 'age')])
+
+y <- combined_dat$sleep_hours_avg
+
+lambda_grid <- 10^seq(3, -3, length = 100)
+
+EN_model <- glmnet(x, y, alpha = 0.5, lambda = lambda_grid)
+
+set.seed(123) 
+cv.EN <- cv.glmnet(x, y, alpha = 0.5, lambda = lambda_grid)
+
+lambda_min_EN <- cv.EN$lambda.min  
+lambda_1se_EN <- cv.EN$lambda.1se  
+
+print(paste("Best lambda (min):", lambda_min_EN))
+print(paste("Best lambda (1se):", lambda_1se_EN))
+
+plot(cv.EN)
+
+final_model <- glmnet(x, y, alpha = 0.5, lambda = lambda_min_EN)
+
+coef(final_model)
+
+fitted_values <- predict(final_model, newx = x, s = lambda_min_EN)
+fitted_values <- as.vector(fitted_values)
+residuals_values <- y - fitted_values
+
+plot(fitted_values, residuals_values, 
+     xlab = "Fitted Values", ylab = "Residuals", 
+     main = "Residual Plot")
+abline(h = 0, col = "pink")
+
+qqnorm(residuals_values, main = "Q-Q Plot of Residuals")
+qqline(residuals_values, col = "blue")
 
 
 ```
