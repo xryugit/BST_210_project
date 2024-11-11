@@ -29,35 +29,23 @@ install.packages("Rnhanesdata")
 
 mutate(DPQ, )
 
-```{r,warning=FALSE}
-library(sampleSelection)
-library(tidyverse)   
-library(haven)      
-library(NHANES)     
-library(dplyr)  
-library(purrr)
-library(lubridate)
-library(mice)
-library(naniar)
-library(ggrepel)
-getwd()
-setwd("./data/13_14")
 
-ALQ <- read_xpt("ALQ_H.XPT")
-BIOPRO <- read_xpt("BIOPRO_H.XPT")
-BMX <- read_xpt("BMX_H.XPT")
-BPX <- read_xpt("BPX_H.XPT")
-CAFE <- read_xpt("CAFE_H.XPT")
-CUSEZN <- read_xpt("CUSEZN_H.XPT") #zinc
-DEMO <- read_xpt("DEMO_H.XPT")
-DPQ_raw <- read_xpt("DPQ_H.XPT")
-GLU <- read_xpt("GLU_H.XPT")
-INQ <- read_xpt("INQ_H.XPT")
-PAQ <- read_xpt("PAQ_H.XPT")
-SLQ <- read_xpt("SLQ_H.XPT")
-TCHOL <- read_xpt("TCHOL_H.XPT")
-VID <- read_xpt("VID_H.XPT")
-VITB12 <- read_xpt("VITB12_H.XPT")
+```{r}
+
+getwd()
+setwd("./data/2020")
+
+ALQ <- read_xpt("P_ALQ.XPT")
+BIOPRO <- read_xpt("P_BIOPRO.XPT")
+BMX <- read_xpt("P_BMX.XPT")
+BPXO <- read_xpt("P_BPXO.XPT")
+DEMO <- read_xpt("P_DEMO.XPT")
+#FOLATE <- read_xpt("P_FOLATE.XPT")
+PAQ <- read_xpt("P_PAQ.XPT")
+SLQ <- read_xpt("P_SLQ.XPT")
+TCHOL <- read_xpt("P_TCHOL.XPT")
+DPQ_raw <- read_xpt("P_DPQ.XPT")
+FETIB <- read_xpt("P_FETIB.XPT")
 
 DPQ <- DPQ_raw %>% 
     filter(complete.cases(select(., starts_with("DPQ"))[-1])) %>% 
@@ -70,90 +58,58 @@ DPQ <- DPQ_raw %>%
         depression_score >= 20 ~ "Severe"
     ))
 
-BPX <- BPX %>%
+BPXO <- BPXO %>%
   mutate(
-    MAP1 = (1 / 3) * BPXSY1 + (2 / 3) * BPXDI1,
-    MAP2 = (1 / 3) * BPXSY2 + (2 / 3) * BPXDI2,
-    MAP3 = (1 / 3) * BPXSY3 + (2 / 3) * BPXDI3,
+    MAP1 = (1 / 3) * BPXOSY1 + (2 / 3) * BPXODI1,
+    MAP2 = (1 / 3) * BPXOSY2 + (2 / 3) * BPXODI2,
+    MAP3 = (1 / 3) * BPXOSY3 + (2 / 3) * BPXODI3,
     avg_MAP = rowMeans(cbind(MAP1, MAP2, MAP3), na.rm = TRUE)
   )
-
-PAQ <- PAQ %>%
-  mutate(
-    PAQ710 = case_when(
-      PAQ710 == 8 ~ 0,
-      PAQ710 == 77 ~ NA_real_,
-      PAQ710 == 99 ~ NA_real_,
-      TRUE ~ as.numeric(PAQ710)
-    ),
-    PAQ715 = case_when(
-      PAQ715 == 8 ~ 0,
-      PAQ715 == 77 ~ NA_real_,
-      PAQ715 == 99 ~ NA_real_,
-      TRUE ~ as.numeric(PAQ715)
-    ),
-    screen_time = PAQ710 + PAQ715
-  )
-
-
-
-datasets <- list(ALQ, BIOPRO, BMX,BPX, DEMO , PAQ, SLQ, TCHOL, DPQ , INQ, VID, VITB12)
+datasets <- list(ALQ, BIOPRO, BMX, BPXO, DEMO,  PAQ, SLQ, TCHOL, DPQ)
 test <- reduce(datasets, inner_join, by = "SEQN")  
 
 
-temp <- select(test, SEQN, RIDAGEYR, RIAGENDR, RIDRETH3, ALQ130 , BMXBMI, avg_MAP,INDFMMPI, screen_time ,PAD680 ,LBDTCSI, SLD010H ,SLQ050, SLQ060, depression_score, depression_category, LBXVIDMS, LBDB12SI)
+temp <- select(test, SEQN , BMXBMI, avg_MAP, ALQ130, RIAGENDR, RIDRETH1, RIDAGEYR, INDFMPIR, PAD680, LBDTCSI, depression_score, depression_category)
 
 dat_raw <- left_join(SLQ, temp)
 
-# DMDEDUC2(education level 20+)
-# DMDMARTZ - Marital status
-```
-
-## scanning raw data
-
-```{r}
-str(dat_raw) 
-summary(dat_raw) 
-```
-
-## Data cleaning
-
-```{r}
-# rename cols
-new_colnames <- c(
-  
-  "ID",                           # SEQN; Respondent sequence number
-  "sleep_hours",            # SLD010H; Usual hours of sleep on weekdays
-  "sleep_trouble",          # SLQ050; Ever told doctor had trouble sleeping?
-  "sleep_diagnosed",        # SLQ060; Ever told by doctor have sleep disorder?
-  "age",                          # RIDAGEYR; Age at screening
-  "gender",                       # RIAGENDR; Gender
-  "race_ethnicity",               # RIDRETH3; Race/Ethnicity category
-  "alcohol",     # ALQ120Q; How often drank alcohol in past 12 months
-  "BMI",
-  "avg_MAP",              # avg_MAP
-  "income", # INDFMMPI; Family income to poverty ratio
-  "screen_time",                   # TV+computer time
-  "sedentary_minutes",            # PAD680; Minutes of sedentary activity
-  "total_cholesterol",            # LBDTCSI; Total cholesterol (mg/dL)
-
-  "depression_score",             # depression_score; Calculated total depression score
-  "depression_category",          # depression_category; Depression score category
-  "vitamin_d",                    # LBXVIDMS; Vitamin D level (nmol/L)
-  "vitamin_b12"                   # LBDB12SI; Vitamin B12 level (pmol/L)
+new_colnames <-  c(
+  "ID",                          # SEQN; Respondent sequence number
+  "sleep_time_weekdays",       # SLQ300;Usual_sleep_time_weekdays
+  "wake_time_weekdays",        # SLQ310;Usual_wake_time_weekdays
+  "sleep_hours_weekdays",            # SLD012;Sleep_hours_weekdays
+  "sleep_time_weekends",       # SLQ320;Usual_sleep_time_weekends
+  "wake_time_weekends",        # SLQ330;Usual_wake_time_weekends
+  "sleep_hours_weekends",            # SLD013;Sleep_hours_weekends
+  "frq_snore",                 # SLQ030;How_often_snore
+  "frq_snort_or_stop_breathing",# SLQ040;How_often_snort_or_stop_breathing
+  "sleep_trouble",  # SLQ050;Ever_told_doctor_sleep_trouble
+  "overly_sleepy",          # SLQ120;Feel_overly_sleepy_day
+  "BMI",                         # BMXBMI; Body Mass Index
+  "avg_MAP",                     # avg_MAP; Average Mean Arterial Pressure
+  "alcohol",                     # ALQ130; How often drink alcohol
+  "gender",                      # RIAGENDR; Gender
+  "Race_Hispanic_origin",        # RIDRETH1; Race/Hispanic origin
+  "age",                         # RIDAGEYR; Age at screening
+  "Family_income_to_poverty_ratio",  # INDFMPIR; Family income to poverty ratio
+  "sedentary_activity",          # PAD680; Minutes sedentary activity
+  "total_cholesterol",           # LBDTCSI; Total cholesterol mmol/L
+  "depression_score",            # depression_score; Depression score
+  "depression_category"          # depression_category; Depression category
 )
 colnames(dat_raw) <- new_colnames
 # remove all lines with NA
 dat_raw[dat_raw == ""] <- NA
 dat_clean <- dat_raw |>
   drop_na() |>
-  filter(alcohol < 16  & sedentary_minutes < 6000 & sleep_hours < 66 & sleep_trouble < 3 & sleep_diagnosed < 3 & vitamin_b12 <= 2500 & vitamin_d <= 200, total_cholesterol < 20) |>
-  mutate(across(c(ID, sleep_trouble, sleep_diagnosed, gender, race_ethnicity), as.factor))
-
-
-
+   filter(alcohol < 16 & frq_snore != 7 & frq_snore != 9 & frq_snort_or_stop_breathing != 7 & frq_snort_or_stop_breathing != 9 & sleep_trouble != 9 & overly_sleepy != 9 & sedentary_activity < 5000) |>
+  mutate(across(c(sleep_time_weekdays,wake_time_weekdays,sleep_time_weekends,wake_time_weekends), hm)) |>
+  mutate(across(c(ID,frq_snore,frq_snort_or_stop_breathing,sleep_trouble,overly_sleepy,gender,Race_Hispanic_origin),as.factor)) |>
+  mutate(across(c(,),as.numeric)) |>
+  mutate(sleep_hours_avg = 2/7*sleep_hours_weekends+5/7*sleep_hours_weekdays)
 
 ```
+
 
 ## scanning cleaned data
 
@@ -168,7 +124,8 @@ summary(dat_clean)
 
 summary(dat_clean)
 
-numeric_vars <- select(dat_clean, age, BMI, avg_MAP, income, screen_time, sedentary_minutes, total_cholesterol, sleep_hours, depression_score, vitamin_d, vitamin_b12, alcohol)
+numeric_vars <- select(dat_clean, age, BMI, avg_MAP, Family_income_to_poverty_ratio, 
+                       sedentary_activity, total_cholesterol, sleep_hours_weekdays, depression_score, alcohol)
 
 
 for (col in colnames(numeric_vars)) {
@@ -183,7 +140,7 @@ for (col in colnames(numeric_vars)) {
 }
 
 
-categorical_vars <- select(dat_clean, gender, race_ethnicity, sleep_trouble, sleep_diagnosed, depression_category)
+categorical_vars <- select(dat_clean, gender, Race_Hispanic_origin, sleep_trouble, overly_sleepy, depression_category)
 
 for (col in colnames(categorical_vars)) {
   p <- ggplot(dat_clean, aes_string(x = col)) +
@@ -290,18 +247,18 @@ for (col in colnames(categorical_vars)) {
 ```{r}
 
 for (col in colnames(numeric_vars)) {
-  p <- ggplot(dat_clean, aes_string(x = "sleep_diagnosed", y = col)) +
+  p <- ggplot(dat_clean, aes_string(x = "frq_snore", y = col)) +
     geom_boxplot(fill = "orange", alpha = 0.7) +
-    labs(title = paste("Box Plot of", col, "vs Sleep Diagnosed"), x = "Sleep Diagnosed", y = col) +
+    labs(title = paste("Box Plot of", col, "vs frq_snore"), x = "frq_snore", y = col) +
     theme_minimal()
   print(p)
 }
 
 for (col in colnames(categorical_vars)) {
   if (col != "sleep_diagnosed") {
-    p <- ggplot(dat_clean, aes_string(x = col, fill = "sleep_diagnosed")) +
+    p <- ggplot(dat_clean, aes_string(x = col, fill = "frq_snore")) +
       geom_bar(position = "fill") +
-      labs(title = paste("Distribution of", col, "by Sleep Diagnosed"), x = col, y = "Proportion") +
+      labs(title = paste("Distribution of", col, "by frq_snore"), x = col, y = "Proportion") +
       theme_minimal() +
       scale_fill_discrete(drop = FALSE)
     print(p)
@@ -311,30 +268,30 @@ for (col in colnames(categorical_vars)) {
 
 ```{r}
 for (col in colnames(numeric_vars)) {
-  if (col != "sleep_hours") {
-    p <- ggplot(dat_clean, aes_string(x = col, y = "sleep_hours")) +
+  if (col != "sleep_hours_weekdays") {
+    p <- ggplot(dat_clean, aes_string(x = col, y = "sleep_hours_weekdays")) +
       geom_point(alpha = 0.5) +
       geom_smooth(method = "lm", col = "red", se = FALSE) +
-      labs(title = paste("Scatter Plot of", col, "vs Sleep Hours"), x = col, y = "Sleep Hours") +
+      labs(title = paste("Scatter Plot of", col, "vs sleep_hours_weekdays"), x = col, y = "sleep_hours_weekdays") +
       theme_minimal()
     print(p)
   }
 }
 
 for (col in colnames(categorical_vars)) {
-  p <- ggplot(dat_clean, aes_string(x = col, y = "sleep_hours")) +
+  p <- ggplot(dat_clean, aes_string(x = col, y = "sleep_hours_weekdays")) +
     geom_boxplot(fill = "cyan", alpha = 0.7) +
-    labs(title = paste("Box Plot of", col, "vs Sleep Hours"), x = col, y = "Sleep Hours") +
+    labs(title = paste("Box Plot of", col, "vs sleep_hours_weekdays"), x = col, y = "sleep_hours_weekdays") +
     theme_minimal()
   print(p)
 }
 ```
 
 ```{r}
-ggplot(dat_clean, aes(x = sleep_trouble, fill = sleep_diagnosed)) +
+ggplot(dat_clean, aes(x = sleep_trouble, fill = frq_snore)) +
   geom_bar(position = "dodge", alpha = 0.8) +
   labs(
-    title = "Relationship between Sleep Trouble (Self-Reported) and Sleep Diagnosed (By Doctor)",
+    title = "Relationship between Sleep Trouble  and frq_snore ",
     x = "Told Doctor They Had Sleep Trouble",
     y = "Count",
     fill = "Diagnosed by Doctor"
@@ -344,10 +301,10 @@ ggplot(dat_clean, aes(x = sleep_trouble, fill = sleep_diagnosed)) +
 ```
 
 ```{r}
-ggplot(dat_clean, aes(x = sleep_trouble, y = sleep_hours)) +
+ggplot(dat_clean, aes(x = sleep_trouble, y = sleep_hours_weekdays)) +
   geom_boxplot(fill = "skyblue", alpha = 0.7) +
   labs(
-    title = "Relationship between Sleep Trouble (Self-Reported) and Sleep Hours",
+    title = "Relationship between Sleep Trouble (Self-Reported) and sleep hours",
     x = "Sleep Trouble (Self-Reported)",
     y = "Usual Sleep Hours"
   ) +
@@ -355,37 +312,78 @@ ggplot(dat_clean, aes(x = sleep_trouble, y = sleep_hours)) +
 ```
 
 ```{r}
-ggplot(dat_clean, aes(x = sleep_diagnosed, y = sleep_hours)) +
+ggplot(dat_clean, aes(x = frq_snore, y = sleep_hours_weekdays)) +
   geom_boxplot(fill = "skyblue", alpha = 0.7) +
   labs(
-    title = "Relationship between Sleep Diagnosed and Sleep Hours",
-    x = "Sleep Trouble (Self-Reported)",
+    title = "Relationship between frq_snore and Sleep Hours",
+    x = "frq_snore",
     y = "Usual Sleep Hours"
   ) +
   theme_minimal()
 ```
 
 ```{r}
-#write.csv(dat_clean, "2013_14_clean.csv", row.names = FALSE)
+#write.csv(dat_clean, "2017_20_clean.csv", row.names = FALSE)
 ```
 
 ```{r}
 
 dat_temp <- DEMO
 other_dfs <- Filter(function(df) !is.null(df) && "SEQN" %in% colnames(df), 
-                    list(ALQ, BIOPRO, BMX,BPX,  PAQ, SLQ, TCHOL, DPQ , INQ, VID, VITB12))
+                    list(DEMO, SLQ,ALQ, BIOPRO, BMX, BPXO, DEMO,  PAQ,  TCHOL, DPQ))
+
 for (df in other_dfs) {
     dat_temp <- left_join(dat_temp, df, by = "SEQN")
 }
-dat_subset <- select(dat_temp, SEQN, SLD010H, SLQ050, SLQ060, RIDAGEYR, RIAGENDR, RIDRETH3, ALQ120Q, BMXBMI, avg_MAP, INDFMMPI, screen_time, PAD680, LBDTCSI, depression_score, depression_category, LBXVIDMS, LBDB12SI)
+dat_subset <- select(dat_temp,
+                     SEQN,                  # Corresponds to "ID"
+                     SLQ300,                # Corresponds to "sleep_time_weekdays"
+                     SLQ310,                # Corresponds to "wake_time_weekdays"
+                     SLD012,                # Corresponds to "sleep_hours_weekdays"
+                     SLQ320,                # Corresponds to "sleep_time_weekends"
+                     SLQ330,                # Corresponds to "wake_time_weekends"
+                     SLD013,                # Corresponds to "sleep_hours_weekends"
+                     SLQ030,                # Corresponds to "frq_snore"
+                     SLQ040,                # Corresponds to "frq_snort_or_stop_breathing"
+                     SLQ050,                # Corresponds to "sleep_trouble"
+                     SLQ120,                # Corresponds to "overly_sleepy"
+                     BMXBMI,                # Corresponds to "BMI"
+                     avg_MAP,               # Corresponds to "avg_MAP"
+                     ALQ130,                # Corresponds to "alcohol"
+                     RIAGENDR,              # Corresponds to "gender"
+                     RIDRETH1,              # Corresponds to "Race_Hispanic_origin"
+                     RIDAGEYR,              # Corresponds to "age"
+                     INDFMPIR,              # Corresponds to "Family_income_to_poverty_ratio"
+                     PAD680,                # Corresponds to "sedentary_activity"
+                     LBDTCSI,               # Corresponds to "total_cholesterol"
+                     depression_score,      # Corresponds to "depression_score"
+                     depression_category    # Corresponds to "depression_category"
+)
 colnames(dat_subset) <- new_colnames
 subset_pat<-md.pattern(dat_subset)
 #md.pattern(dat_temp)
 ```
 
+
+
 ```{r}
 vis_miss(dat_subset)
 ```
+
+
+```
+                     SLQ300,                # Corresponds to "sleep_time_weekdays"
+                     SLQ310,                # Corresponds to "wake_time_weekdays"
+                     SLD012,                # Corresponds to "sleep_hours_weekdays"
+                     SLQ320,                # Corresponds to "sleep_time_weekends"
+                     SLQ330,                # Corresponds to "wake_time_weekends"
+                     SLD013,                # Corresponds to "sleep_hours_weekends"
+                     SLQ030,                # Corresponds to "frq_snore"
+                     SLQ040,                # Corresponds to "frq_snort_or_stop_breathing"
+                     SLQ050,                # Corresponds to "sleep_trouble"
+                     SLQ120,                # Corresponds to "overly_sleepy"
+```
+
 
 ```{r}
 dat_subset_missing_indicators <- dat_subset %>%
@@ -398,28 +396,47 @@ summary(glm(miss_sleep_trouble ~ BMI, data = dat_subset_missing_indicators, fami
 dat_subset_missing_indicators <- dat_subset %>%
   mutate(miss_sleep_trouble = ifelse(is.na(sleep_trouble), 1, 0))
 
-covariate_names <- setdiff(names(dat_subset_missing_indicators), c("sleep_trouble", "miss_sleep_trouble", "ID", "sleep_hours", "miss_sleep_hours", "sleep_diagnosed" ,"miss_sleep_diagnosed", "depression_category"))
+covariate_names <- setdiff(names(dat_subset_missing_indicators), c("sleep_time_weekdays", "miss_sleep_time_weekdays", "ID", "sleep_hours_weekdays", "miss_sleep_hours_weekdays", "wake_time_weekdays","miss_wake_time_weekdays", "sleep_time_weekends","miss_sleep_time_weekends" ,"wake_time_weekends","miss_wake_time_weekends", "depression_category" ,"sleep_hours_weekends", "miss_sleep_hours_weekends" , "frq_snort_or_stop_breathing" , "miss_frq_snort_or_stop_breathing"))
 
 results_list <- list()
 
 for (covariate in covariate_names) {
+  # Define the formula
   formula <- as.formula(paste("miss_sleep_trouble ~", covariate))
-  model <- glm(formula, data = dat_subset_missing_indicators, family = binomial)
-  summary_model <- summary(model)
-  p_value <- summary_model$coefficients[2, 4]  
-  results_list[[covariate]] <- list(
-    estimate = summary_model$coefficients[2, 1],
-    std_error = summary_model$coefficients[2, 2],
-    z_value = summary_model$coefficients[2, 3],
-    p_value = p_value
-  )
+  
+  # Fit the model and handle warnings and errors
+  tryCatch({
+    model <- glm(formula, data = dat_subset_missing_indicators, family = binomial, control = glm.control(maxit = 50))
+    if (!model$converged) {
+      warning(paste("Model did not converge for covariate:", covariate))
+    } else {
+      summary_model <- summary(model)
+      p_value <- summary_model$coefficients[2, 4]
+      
+      # Store the results
+      results_list[[covariate]] <- list(
+        estimate = summary_model$coefficients[2, 1],
+        std_error = summary_model$coefficients[2, 2],
+        z_value = summary_model$coefficients[2, 3],
+        p_value = p_value
+      )
+    }
+  }, error = function(e) {
+    message(paste("Model failed for covariate:", covariate, "with error:", e$message))
+  }, warning = function(w) {
+    message(paste("Warning for covariate:", covariate, "-", w$message))
+  })
 }
 
-results_df <- do.call(rbind, lapply(names(results_list), function(name) {
-  c(covariate = name, results_list[[name]])
-}))
-
-print(results_df)
+if (length(results_list) > 0) {
+  results_df <- do.call(rbind, lapply(names(results_list), function(name) {
+    c(covariate = name, results_list[[name]])
+  }))
+  
+  print(results_df)
+} else {
+  message("No models converged successfully.")
+}
 
 ```
 
@@ -459,13 +476,13 @@ summary(multivariable_model)
 
 imputed_data <- mice(
   dat_subset,
-  m = 1,              
+  m = 5,              
   maxit = 10,          
   method = 'pmm',      
   delta = 0            
 )
 completed_data <- complete(imputed_data, action = 1)
-write.csv(completed_data, file = "./data/Imputed_Dataset_2013_14.csv", row.names = FALSE)
+write.csv(completed_data, file = "./data/Imputed_Dataset_2017_20.csv", row.names = FALSE)
 
 ```
 
