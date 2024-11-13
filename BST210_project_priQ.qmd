@@ -232,7 +232,7 @@ auc(roccurve)
 ```
 
 
-The odds of ever having sleep trouble is estimated to be exp(0.1377799) = 1.147723 times the odds of ever having sleep trouble among poeple with a one-unit higher depression score on average, holding other covariates constant, according to these sample data. 
+The odds of ever having sleep trouble is estimated to be exp(0.124701) = 1.1328 times the odds of ever having sleep trouble among poeple with a one-unit higher depression score on average, holding other covariates constant, according to these sample data. 
 
 
 ```{r}

@@ -22,9 +22,10 @@ library(ggrepel)
 ```
 
 ### 13-14
+
 ```{r}
 getwd()
-setwd("data/2020")
+setwd("data/13_14")
 
 ALQ <- read_xpt("ALQ_H.XPT")
 BIOPRO <- read_xpt("BIOPRO_H.XPT")
@@ -80,12 +81,58 @@ PAQ <- PAQ %>%
 
 
 
-datasets_1314 <- list(ALQ, BIOPRO, BMX,BPX, DEMO , PAQ, SLQ, TCHOL, DPQ , INQ, VID, VITB12)
-test_1314 <- reduce(datasets_1314, inner_join, by = "SEQN")  
+datasets <- list(ALQ, BIOPRO, BMX,BPX, DEMO , PAQ, SLQ, TCHOL, DPQ , INQ, VID, VITB12)
+test <- reduce(datasets, inner_join, by = "SEQN")  
 
 
-temp_1314 <- select(test_1314, SEQN, RIDAGEYR, RIAGENDR, RIDRETH3, ALQ130 , BMXBMI, avg_MAP,INDFMMPI, screen_time ,PAD680 ,LBDTCSI, SLD010H ,SLQ050, SLQ060, depression_score, depression_category, LBXVIDMS, LBDB12SI)
+temp <- select(test, SEQN, RIDAGEYR, RIAGENDR, RIDRETH3, ALQ130 , BMXBMI, avg_MAP,INDFMMPI, screen_time ,PAD680 ,LBDTCSI, SLD010H ,SLQ050, SLQ060, depression_score, depression_category, LBXVIDMS, LBDB12SI)
 
-dat_raw_1314 <- left_join(SLQ, temp_1314)
+dat_raw <- left_join(SLQ, temp)
+
+# Clean Data 
+
+## rename cols
+new_colnames <- c(
+  
+  "ID",                           # SEQN; Respondent sequence number
+  "sleep_hours",            # SLD010H; Usual hours of sleep on weekdays
+  "sleep_trouble",          # SLQ050; Ever told doctor had trouble sleeping?
+  "sleep_diagnosed",        # SLQ060; Ever told by doctor have sleep disorder?
+  "age",                          # RIDAGEYR; Age at screening
+  "gender",                       # RIAGENDR; Gender
+  "race_ethnicity",               # RIDRETH3; Race/Ethnicity category
+  "alcohol",     # ALQ120Q; How often drank alcohol in past 12 months
+  "BMI",
+  "avg_MAP",              # avg_MAP
+  "income", # INDFMMPI; Family income to poverty ratio
+  "screen_time",                   # TV+computer time
+  "sedentary_minutes",            # PAD680; Minutes of sedentary activity
+  "total_cholesterol",            # LBDTCSI; Total cholesterol (mg/dL)
+
+  "depression_score",             # depression_score; Calculated total depression score
+  "depression_category",          # depression_category; Depression score category
+  "vitamin_d",                    # LBXVIDMS; Vitamin D level (nmol/L)
+  "vitamin_b12"                   # LBDB12SI; Vitamin B12 level (pmol/L)
+)
+colnames(dat_raw) <- new_colnames
+# remove all lines with NA
+dat_raw[dat_raw == ""] <- NA
+dat_clean_1314 <- dat_raw |>
+  drop_na() |>
+  filter(alcohol < 16  & sedentary_minutes < 6000 & sleep_hours < 66 & sleep_trouble < 3 & sleep_diagnosed < 3 & vitamin_b12 <= 2500 & vitamin_d <= 200, total_cholesterol < 20) |>
+  mutate(across(c(ID, sleep_trouble, sleep_diagnosed, gender, race_ethnicity), as.factor))
 ```
+
+
+### 2020
+
+```{r}
+
+```
+
+
+
+
+
+
 
