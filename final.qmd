@@ -1,0 +1,1050 @@
+---
+title: "final"
+format: pdf
+editor: visual
+---
+
+
+# Library
+```{r}
+library(tidyverse) 
+library(haven)      
+library(NHANES)     
+library(dplyr)  
+library(purrr)
+library(lubridate)
+library(glmnet)
+library(vip)
+library(car)
+library(caret)
+library(randomForest)
+library(doParallel)
+library(mice)
+library(naniar)
+```
+
+# Dataset
+
+## 2020
+
+### Primary Question
+```{r}
+getwd()
+setwd("./data/2020")
+
+ALQ <- read_xpt("P_ALQ.XPT")
+BIOPRO <- read_xpt("P_BIOPRO.XPT")
+BMX <- read_xpt("P_BMX.XPT")
+BPXO <- read_xpt("P_BPXO.XPT")
+DEMO <- read_xpt("P_DEMO.XPT")
+#FOLATE <- read_xpt("P_FOLATE.XPT")
+PAQ <- read_xpt("P_PAQ.XPT")
+SLQ <- read_xpt("P_SLQ.XPT")
+TCHOL <- read_xpt("P_TCHOL.XPT")
+DPQ_raw <- read_xpt("P_DPQ.XPT")
+
+
+DPQ <- DPQ_raw %>% 
+    filter(complete.cases(select(., starts_with("DPQ"))[-1])) %>% 
+    mutate(depression_score = rowSums(select(., starts_with("DPQ"))[-1])) |> #%>% 
+    mutate(depression_category = case_when(
+        depression_score <= 4 ~ "Minimal",
+        depression_score <= 9 ~ "Mild",
+        depression_score <= 14 ~ "Moderate",
+        depression_score <= 19 ~ "Moderately severe",
+        depression_score >= 20 ~ "Severe"
+    ))
+
+BPXO <- BPXO %>%
+  mutate(
+    MAP1 = (1 / 3) * BPXOSY1 + (2 / 3) * BPXODI1,
+    MAP2 = (1 / 3) * BPXOSY2 + (2 / 3) * BPXODI2,
+    MAP3 = (1 / 3) * BPXOSY3 + (2 / 3) * BPXODI3,
+    avg_MAP = rowMeans(cbind(MAP1, MAP2, MAP3), na.rm = TRUE)
+  )
+
+datasets <- list(ALQ, BIOPRO, BMX, BPXO, DEMO,  PAQ, SLQ, TCHOL, DPQ)
+test <- reduce(datasets, inner_join, by = "SEQN")
+temp <- select(test, SEQN , BMXBMI, avg_MAP, ALQ130, RIAGENDR, RIDRETH3, RIDAGEYR, INDFMPIR, PAD680, LBDTCSI, depression_score, depression_category)
+
+dat_raw_2020 <- left_join(SLQ, temp)
+
+new_colnames <-  c(
+  "ID",                          # SEQN; Respondent sequence number
+  "sleep_time_weekdays",       # SLQ300;Usual_sleep_time_weekdays
+  "wake_time_weekdays",        # SLQ310;Usual_wake_time_weekdays
+  "sleep_hours_weekdays",            # SLD012;Sleep_hours_weekdays
+  "sleep_time_weekends",       # SLQ320;Usual_sleep_time_weekends
+  "wake_time_weekends",        # SLQ330;Usual_wake_time_weekends
+  "sleep_hours_weekends",            # SLD013;Sleep_hours_weekends
+  "frq_snore",                 # SLQ030;How_often_snore
+  "frq_snort_or_stop_breathing",# SLQ040;How_often_snort_or_stop_breathing
+  "sleep_trouble",  # SLQ050;Ever_told_doctor_sleep_trouble
+  "overly_sleepy",          # SLQ120;Feel_overly_sleepy_day
+  "BMI",                         # BMXBMI; Body Mass Index
+  "avg_MAP",                     # avg_MAP; Average Mean Arterial Pressure
+  "alcohol",                     # ALQ130; How often drink alcohol
+  "gender",                      # RIAGENDR; Gender
+  "race_ethnicity",        # RIDRETH1; Race/Hispanic origin
+  "age",                         # RIDAGEYR; Age at screening
+  "income",  # INDFMPIR; Family income to poverty ratio
+  "sedentary_activity",          # PAD680; Minutes sedentary activity
+  "total_cholesterol",           # LBDTCSI; Total cholesterol mmol/L
+  "depression_score",            # depression_score; Depression score
+  "depression_category"          # depression_category; Depression category
+)
+colnames(dat_raw_2020) <- new_colnames
+#remove all lines with NA
+dat_raw_2020[dat_raw_2020 == ""] <- NA
+dat_2020 <- dat_raw_2020 |>
+  drop_na() |>
+   filter(alcohol < 16 & frq_snore != 7 & frq_snore != 9 & frq_snort_or_stop_breathing != 7 & frq_snort_or_stop_breathing != 9 & sleep_trouble != 9 & overly_sleepy != 9) |>
+  mutate(across(c(sleep_time_weekdays,wake_time_weekdays,sleep_time_weekends,wake_time_weekends), hm)) |>
+  mutate(across(c(ID,frq_snore,frq_snort_or_stop_breathing,sleep_trouble,overly_sleepy,gender,race_ethnicity),as.factor)) |>
+  mutate(across(c(,),as.numeric))
+  
+
+pri_Q <- dat_2020[,c("sleep_trouble","BMI","avg_MAP","total_cholesterol","alcohol","gender","race_ethnicity","age","income","depression_score","depression_category")]
+pri_Q$sleep_trouble <- ifelse(dat_2020$sleep_trouble == "2",0,1)
+```
+
+### Secondary Question 2
+
+```{r}
+getwd()
+setwd("./data/2020")
+ALQ <- read_xpt("P_ALQ.XPT")
+BIOPRO <- read_xpt("P_BIOPRO.XPT")
+BMX <- read_xpt("P_BMX.XPT")
+BPXO <- read_xpt("P_BPXO.XPT")
+DEMO <- read_xpt("P_DEMO.XPT")
+PAQ <- read_xpt("P_PAQ.XPT")
+SLQ <- read_xpt("P_SLQ.XPT")
+TCHOL <- read_xpt("P_TCHOL.XPT")
+DPQ_raw <- read_xpt("P_DPQ.XPT")
+
+#secondary question datasets
+GLU <- read_xpt("P_GLU.XPT")
+INS <- read_xpt("P_INS.XPT")
+PERNT <- read_xpt("P_PERNT.XPT")
+UIO <- read_xpt("P_UIO.XPT")
+TRIGLY <- read_xpt("P_TRIGLY.XPT")
+TCHOL <- read_xpt("P_TCHOL.XPT")
+HUQ <- read_xpt("P_HUQ.XPT")
+
+DPQ <- DPQ_raw %>%
+    filter(complete.cases(select(., starts_with("DPQ"))[-1])) %>%
+    mutate(depression_score = rowSums(select(., starts_with("DPQ"))[-1])) %>%
+    mutate(depression_category = case_when(
+        depression_score <= 4 ~ "Minimal",
+        depression_score <= 9 ~ "Mild",
+        depression_score <= 14 ~ "Moderate",
+        depression_score <= 19 ~ "Moderately severe",
+        depression_score >= 20 ~ "Severe"
+    ))
+
+BPXO <- BPXO %>%
+  mutate(
+    MAP1 = (1 / 3) * BPXOSY1 + (2 / 3) * BPXODI1,
+    MAP2 = (1 / 3) * BPXOSY2 + (2 / 3) * BPXODI2,
+    MAP3 = (1 / 3) * BPXOSY3 + (2 / 3) * BPXODI3,
+    avg_MAP = rowMeans(cbind(MAP1, MAP2, MAP3), na.rm = TRUE)
+  )
+
+datasets <- list(ALQ, BIOPRO, BMX, BPXO, DEMO,  PAQ, SLQ, TCHOL, DPQ)
+test <- reduce(datasets, inner_join, by = "SEQN")  
+
+temp <- select(test, SEQN , BMXBMI, ALQ130, RIAGENDR, RIDRETH3, RIDAGEYR, INDFMPIR, LBXSNASI, LBXSKSI, LBDSCASI, LBXSCLSI, PAD680, depression_score, depression_category)
+
+dat_raw <- left_join(SLQ, temp)
+
+# rename cols
+new_colnames <-  c(
+  "ID",      # SEQN;Respondent_sequence_number
+  "sleep_time_weekdays",       # SLQ300;Usual_sleep_time_weekdays
+  "wake_time_weekdays",        # SLQ310;Usual_wake_time_weekdays
+  "sleep_hours_weekdays",            # SLD012;Sleep_hours_weekdays
+  "sleep_time_weekends",       # SLQ320;Usual_sleep_time_weekends
+  "wake_time_weekends",        # SLQ330;Usual_wake_time_weekends
+  "sleep_hours_weekends",            # SLD013;Sleep_hours_weekends
+  "frq_snore",                 # SLQ030;How_often_snore
+  "frq_snort_or_stop_breathing",# SLQ040;How_often_snort_or_stop_breathing
+  "sleep_trouble",  # SLQ050;Ever_told_doctor_sleep_trouble
+  "overly_sleepy",          # SLQ120;Feel_overly_sleepy_day
+  "BMI",                 # BMXBMI;Body_Mass_Index
+  "alcohol",         # ALQ121;How_often_drink_alcohol
+  "gender",                          # RIAGENDR;Gender
+  "race_ethnicity",            # RIDRETH1;race_ethnicity
+  "age",                # RIDAGEYR;Age_at_screening
+  "income",  # INDFMPIR;income
+  "Na",                   # LBXSNASI;Sodium_mmol_L
+  "K",                # LBXSLSI;Potassium_mmol_L
+  "Ca",            # LBDSCASI;Total_Calcium_mmol_L
+  "Cl",                 # LBXSCLSI;Chloride_mmol_L
+  "sedentary_activity",       # PAD680;Minutes_sedentary_activity
+  "dp_score",
+  "dp_cate"
+  
+)
+colnames(dat_raw) <- new_colnames
+
+# remove all lines with NA
+dat_raw[dat_raw == ""] <- NA
+dat_clean <- dat_raw |>
+  drop_na() |>
+   filter(alcohol < 16 & frq_snore != 7 & frq_snore != 9 & frq_snort_or_stop_breathing != 7 & frq_snort_or_stop_breathing != 9 & sleep_trouble != 9 & overly_sleepy != 9) |>
+  mutate(across(c(sleep_time_weekdays,wake_time_weekdays,sleep_time_weekends,wake_time_weekends), hm)) |>
+  mutate(across(c(ID,frq_snore,frq_snort_or_stop_breathing,sleep_trouble,overly_sleepy,gender,race_ethnicity),as.factor)) |>
+  mutate(across(c(,),as.numeric)) |>
+  mutate(sleep_hours_avg = 2/7*sleep_hours_weekends+5/7*sleep_hours_weekdays)
+
+sec_Q2_raw <- dat_clean[,c("ID", "sleep_trouble","sleep_hours_avg","BMI","alcohol","gender","race_ethnicity","age","income","dp_score","dp_cate")]
+
+GLU <- GLU |> 
+  mutate(ID = as.factor(SEQN)) |> 
+  select(-SEQN)
+
+INS <- INS |> 
+  mutate(ID = as.factor(SEQN))|> 
+  select(-SEQN)
+
+PERNT <- PERNT |> 
+  mutate(ID = as.factor(SEQN))|> 
+  select(-SEQN)
+
+UIO <- UIO |> 
+  mutate(ID = as.factor(SEQN))|> 
+  select(-SEQN)
+
+TRIGLY <- TRIGLY |> 
+  mutate(ID = as.factor(SEQN))|> 
+  select(-SEQN)
+
+HUQ <- HUQ |> 
+  mutate(ID = as.factor(SEQN))|> 
+  select(-SEQN)
+
+BIOPRO2 <- BIOPRO |> 
+  mutate(ID = as.factor(SEQN))|> 
+  select(-SEQN)
+
+TCHOL <- TCHOL |> 
+  mutate(ID = as.factor(SEQN))|> 
+  select(-SEQN)
+
+#combine all datasets
+
+extra_data_list <- list(sec_Q2_raw, GLU, INS, PERNT, UIO, TRIGLY, HUQ, TCHOL, BIOPRO2)
+
+sec_Q2 <- Reduce(function(x, y) left_join(x, y, by = "ID"), extra_data_list) #!change name from combined_dat 
+
+```
+
+
+## 13_14
+
+### Secondary Question 1
+```{r}
+getwd()
+setwd("./data/13_14")
+ALQ <- read_xpt("ALQ_H.XPT")
+BIOPRO <- read_xpt("BIOPRO_H.XPT")
+BMX <- read_xpt("BMX_H.XPT")
+BPX <- read_xpt("BPX_H.XPT")
+CAFE <- read_xpt("CAFE_H.XPT")
+CUSEZN <- read_xpt("CUSEZN_H.XPT") #zinc
+DEMO <- read_xpt("DEMO_H.XPT")
+DPQ_raw <- read_xpt("DPQ_H.XPT")
+GLU <- read_xpt("GLU_H.XPT")
+INQ <- read_xpt("INQ_H.XPT")
+PAQ <- read_xpt("PAQ_H.XPT")
+SLQ <- read_xpt("SLQ_H.XPT")
+TCHOL <- read_xpt("TCHOL_H.XPT")
+VID <- read_xpt("VID_H.XPT")
+VITB12 <- read_xpt("VITB12_H.XPT")
+
+DPQ <- DPQ_raw %>%
+    filter(complete.cases(select(., starts_with("DPQ"))[-1])) %>%
+    mutate(depression_score = rowSums(select(., starts_with("DPQ"))[-1])) %>%
+    mutate(depression_category = case_when(
+        depression_score <= 4 ~ "Minimal",
+        depression_score <= 9 ~ "Mild",
+        depression_score <= 14 ~ "Moderate",
+        depression_score <= 19 ~ "Moderately severe",
+        depression_score >= 20 ~ "Severe"
+    ))
+
+BPX <- BPX %>%
+  mutate(
+    avg_systolic = rowMeans(select(., BPXSY1, BPXSY2, BPXSY3, BPXSY4), na.rm = TRUE),
+    avg_diastolic = rowMeans(select(., BPXDI1, BPXDI2, BPXDI3, BPXDI4), na.rm = TRUE),
+    avg_MAP = 2/3*avg_diastolic+ 1/3*avg_systolic
+  )
+
+PAQ <- PAQ %>%
+  mutate(
+    PAQ710 = case_when(
+      PAQ710 == 8 ~ 0,
+      PAQ710 == 77 ~ NA_real_,
+      PAQ710 == 99 ~ NA_real_,
+      TRUE ~ as.numeric(PAQ710)
+    ),
+    PAQ715 = case_when(
+      PAQ715 == 8 ~ 0,
+      PAQ715 == 77 ~ NA_real_,
+      PAQ715 == 99 ~ NA_real_,
+      TRUE ~ as.numeric(PAQ715)
+    ),
+    screen_time = PAQ710 + PAQ715
+  )
+
+
+
+datasets <- list(ALQ, BIOPRO, BMX,BPX, DEMO , PAQ, SLQ, TCHOL, DPQ , INQ, VID, VITB12)
+test <- reduce(datasets, inner_join, by = "SEQN")  
+
+
+temp <- select(test, SEQN, RIDAGEYR, RIAGENDR, RIDRETH3, ALQ120Q , BMXBMI, avg_MAP,INDFMMPI, screen_time ,PAD680 ,LBDTCSI, SLD010H ,SLQ050, SLQ060, depression_score, depression_category, LBXVIDMS, LBDB12SI)
+
+dat_raw_13 <- left_join(SLQ, temp)
+
+# rename cols
+new_colnames <- c(
+  
+  "ID",                           # SEQN; Respondent sequence number
+  "sleep_hours",            # SLD010H; Usual hours of sleep on weekdays
+  "sleep_trouble",          # SLQ050; Ever told doctor had trouble sleeping?
+  "sleep_diagnosed",        # SLQ060; Ever told by doctor have sleep disorder?
+  "age",                          # RIDAGEYR; Age at screening
+  "gender",                       # RIAGENDR; Gender
+  "race_ethnicity",               # RIDRETH3; Race/Ethnicity category
+  "alcohol",     # ALQ120Q; How often drank alcohol in past 12 months
+  "BMI",
+  "avg_MAP",              # avg_MAP
+  "income", # INDFMMPI; Family income to poverty ratio
+  "screen_time",                   # TV+computer time
+  "sedentary_minutes",            # PAD680; Minutes of sedentary activity
+  "total_cholesterol",            # LBDTCSI; Total cholesterol (mg/dL)
+  "depression_score",             # depression_score; Calculated total depression score
+  "depression_category",          # depression_category; Depression score category
+  "vitamin_d",                    # LBXVIDMS; Vitamin D level (nmol/L)
+  "vitamin_b12"                   # LBDB12SI; Vitamin B12 level (pmol/L)
+)
+colnames(dat_raw_13) <- new_colnames
+# remove all lines with NA
+dat_raw_13[dat_raw_13 == ""] <- NA
+dat_clean <- dat_raw_13 |>
+  drop_na() |>
+  filter(alcohol < 400  & sedentary_minutes < 6000 & sleep_hours < 66 & sleep_trouble < 3 & sleep_diagnosed < 3 & vitamin_b12 <= 2500 & vitamin_d <= 200, total_cholesterol < 20) |>
+  mutate(across(c(ID, sleep_trouble, sleep_diagnosed, gender, race_ethnicity), as.factor))
+
+
+
+sec_Q1 <- dat_clean[,c("sleep_trouble","BMI","alcohol","gender","race_ethnicity","age","income","depression_score","depression_category","avg_MAP","total_cholesterol")]
+sec_Q1$sleep_trouble <- ifelse(dat_clean$sleep_trouble == "2",0,1)
+```
+
+## 15-16
+```{r}
+getwd()
+setwd("./data/15_16")
+ALQ <- read_xpt("ALQ_I.xpt")
+BIOPRO <- read_xpt("BIOPRO_I.xpt")
+BMX <- read_xpt("BMX_I.xpt")
+BPXO <- read_xpt("BPX_I.xpt")
+DEMO <- read_xpt("DEMO_I.xpt")
+DPQ_raw <- read_xpt("DPQ_I.xpt")
+GLU <- read_xpt("GLU_I.xpt")
+HUQ <- read_xpt("HUQ_I.xpt")
+INS <- read_xpt("INS_I.xpt")
+PAQ <- read_xpt("PAQ_I.xpt")
+PERNT <- read_xpt("PERNT_I.xpt")
+SLQ <- read_xpt("SLQ_I.xpt")
+TCHOL <- read_xpt("TCHOL_I.xpt")
+TRIGLY <- read_xpt("TRIGLY_I.xpt")
+UIO <- read_xpt("UIO_I.xpt")
+
+DPQ <- DPQ_raw %>% 
+    filter(complete.cases(select(., starts_with("DPQ"))[-1])) %>% 
+    mutate(depression_score = rowSums(select(., starts_with("DPQ"))[-1])) |> #%>% 
+    mutate(depression_category = case_when(
+        depression_score <= 4 ~ "Minimal",
+        depression_score <= 9 ~ "Mild",
+        depression_score <= 14 ~ "Moderate",
+        depression_score <= 19 ~ "Moderately severe",
+        depression_score >= 20 ~ "Severe"
+    ))
+
+BPXO <- BPXO %>%
+  mutate(
+    MAP1 = (1 / 3) * BPXSY1 + (2 / 3) * BPXDI1,
+    MAP2 = (1 / 3) * BPXSY2 + (2 / 3) * BPXDI2,
+    MAP3 = (1 / 3) * BPXSY3 + (2 / 3) * BPXDI3,
+    avg_MAP = rowMeans(cbind(MAP1, MAP2, MAP3), na.rm = TRUE)
+  )
+
+
+datasets <- list(ALQ, BIOPRO, BMX, BPXO, DEMO,  PAQ, SLQ, TCHOL, DPQ)
+test <- reduce(datasets, inner_join, by = "SEQN")
+temp <- select(test, SEQN , BMXBMI, avg_MAP, ALQ130, RIAGENDR, RIDRETH3, RIDAGEYR, INDFMPIR, PAD680, LBDTCSI, depression_score, depression_category)
+
+dat_raw_15 <- left_join(SLQ, temp)
+
+new_colnames <-  c(
+  "ID",                          # SEQN; Respondent sequence number
+  "sleep_time_weekdays",       # SLQ300;Usual_sleep_time_weekdays
+  "wake_time_weekdays",        # SLQ310;Usual_wake_time_weekdays
+  "sleep_hours",            # SLD012;Sleep_hours
+  "frq_snore",                 # SLQ030;How_often_snore
+  "frq_snort_or_stop_breathing",# SLQ040;How_often_snort_or_stop_breathing
+  "sleep_trouble",  # SLQ050;Ever_told_doctor_sleep_trouble
+  "overly_sleepy",          # SLQ120;Feel_overly_sleepy_day
+  "BMI",                         # BMXBMI; Body Mass Index
+  "avg_MAP",                     # avg_MAP; Average Mean Arterial Pressure
+  "alcohol",                     # ALQ130; How often drink alcohol
+  "gender",                      # RIAGENDR; Gender
+  "race_ethnicity",        # RIDRETH1; Race/Hispanic origin
+  "age",                         # RIDAGEYR; Age at screening
+  "income",  # INDFMPIR; Family income to poverty ratio
+  "sedentary_activity",          # PAD680; Minutes sedentary activity
+  "total_cholesterol",           # LBDTCSI; Total cholesterol mmol/L
+  "depression_score",            # depression_score; Depression score
+  "depression_category"          # depression_category; Depression category
+)
+colnames(dat_raw_15) <- new_colnames
+#remove all lines with NA
+dat_raw_15[dat_raw_15 == ""] <- NA
+dat_1516 <- dat_raw_15 |>
+  drop_na() |>
+   filter(alcohol < 16 & frq_snore != 7 & frq_snore != 9 & frq_snort_or_stop_breathing != 7 & frq_snort_or_stop_breathing != 9 & sleep_trouble != 9 & overly_sleepy != 9) |>
+  mutate(across(c(ID,frq_snore,frq_snort_or_stop_breathing,sleep_trouble,overly_sleepy,gender,race_ethnicity),as.factor)) |>
+  mutate(across(c(,),as.numeric))
+
+sec_Q3 <- dat_1516[,c("sleep_trouble","BMI","avg_MAP","total_cholesterol","alcohol","gender","race_ethnicity","age","income","depression_score","depression_category")]
+sec_Q3$sleep_trouble <- ifelse(dat_1516$sleep_trouble == "2",0,1)
+
+```
+
+# EDA
+
+## 2020
+
+```{r}
+
+```
+
+## 13_14
+
+```{r}
+
+```
+
+# Primary Question
+
+## categorical depression_score vs continuous depression_score
+
+$$
+\log\left(\frac{p_{sleep~disorder}}{1-p_{sleep~disorder}}\right) = \beta_{k,0} + \beta_{k,1} depression_{i}
+$$
+
+```{r}
+cate <- glm(sleep_trouble ~ as.factor(depression_category), data = pri_Q, family = "binomial")
+conti <- glm(sleep_trouble ~ depression_score, data = pri_Q, family = "binomial")
+summary(cate)
+summary(conti)
+anova(cate, conti, test="Chisq")
+pri_Q <- pri_Q |>
+  select(-depression_category)
+```
+
+## VIF
+```{r}
+full_model <- glm(sleep_trouble ~ BMI+alcohol+gender+race_ethnicity+age+income+depression_score+avg_MAP+total_cholesterol,data = pri_Q, family = "binomial")
+vif(full_model)
+```
+
+## Check the assumption that the relationship between a categorical covariate and an outcome changes linearly from one category to the next
+```{r}
+plot(conti$fitted.values~pri_Q$depression_score,type='p',
+     col='black',ylab="P(sleep~disorder)",xlab="age")
+lines(cate$fitted.values~pri_Q$depression_score,type='p',
+      col="red")
+legend('bottomright',legend=c("linear","ordinal"),
+       pch=c(1,1),col=c(1,2))
+```
+
+## potential confounders
+
+BMI, alcohol, gender, race_ethnicity, age, and income appear to satisfy the causal definition of a confounder
+
+```{r}
+mod2 <- glm(sleep_trouble ~ BMI+alcohol+gender+race_ethnicity+age+income+depression_score+avg_MAP,data = pri_Q, family = "binomial")
+summary(mod2)
+```
+
+## potential effect modifier
+```{r}
+mod3 <- update(mod2,. ~ .+depression_score*BMI)
+coef(summary(mod3))["BMI:depression_score", "Pr(>|z|)"]
+mod3 <- update(mod2,. ~ .+depression_score*alcohol)
+coef(summary(mod3))["alcohol:depression_score", "Pr(>|z|)"]
+mod3 <- update(mod2,. ~ .+depression_score*gender)
+coef(summary(mod3))["gender2:depression_score", "Pr(>|z|)"]
+mod3 <- update(mod2,. ~ .+depression_score*race_ethnicity)
+summary(mod3)
+mod3 <- update(mod2,. ~ .+depression_score*age)
+coef(summary(mod3))["age:depression_score", "Pr(>|z|)"]
+mod3 <- update(mod2,. ~ .+depression_score*income)
+summary(mod3)
+mod3 <- update(mod2,. ~ .+depression_score*avg_MAP)
+coef(summary(mod3))["depression_score:avg_MAP", "Pr(>|z|)"]
+mod3 <- update(mod2,. ~ .+depression_score*total_cholesterol)
+coef(summary(mod3))["depression_score:total_cholesterol", "Pr(>|z|)"]
+```
+
+## Assess possible nonlinear effect of BMI, alcohol, income, and age
+```{r}
+mod3 <- update(mod2,. ~ .+ I(BMI^2))
+coef(summary(mod3))["I(BMI^2)", "Pr(>|z|)"]
+mod3 <- update(mod2,. ~ .+ I(alcohol^2))
+coef(summary(mod3))["I(alcohol^2)", "Pr(>|z|)"]
+mod3 <- update(mod2,. ~ .+ I(age^2))
+coef(summary(mod3))["I(age^2)", "Pr(>|z|)"]
+mod4 <- update(mod3,. ~ .+ I(alcohol^2))
+coef(summary(mod4))["I(alcohol^2)", "Pr(>|z|)"]
+mod4 <- update(mod3,. ~ .+ I(income^2))
+coef(summary(mod4))["I(income^2)", "Pr(>|z|)"]
+mod4 <- update(mod3,. ~ .+I(avg_MAP^2))
+coef(summary(mod4))["I(avg_MAP^2)", "Pr(>|z|)"]
+mod4 <- update(mod3,. ~ .+I(total_cholesterol^2))
+coef(summary(mod4))["I(total_cholesterol^2)", "Pr(>|z|)"]
+```
+
+$$
+\log\left(\frac{p_{sleep~disorder}}{1-p_{sleep~disorder}}\right) = \beta_{k,0} + \beta_{k,1} depression_{i} + \beta_{k,2} BMI _{i} + \beta_{k,3} alcohol_{i} + \beta_{k,4} Race_{i} + \beta_{k,5} age_{i} + \beta_{k,6} age^2_{i}+ \beta_{k,7} income_{i} + \beta_{k,8} \text{avg_MAP}_{i} + \beta_{k,9} \text{total_cholesterol}_{i}
+$$
+## check high influence points
+```{r}
+par(mfrow=c(1,1))
+influencePlot(mod3,col="red")
+influenceIndexPlot(mod3)
+```
+
+## GOF
+
+Hosmer-Lemeshow test because we have a larger number of covariate patterns.
+
+```{r}
+library(ResourceSelection)
+options(digits=7)
+# Hosmer-Lemeshow Test
+hoslem.test(mod3$y,fitted(mod3),g=10)
+```
+
+## ROC
+```{r}
+library(pROC)
+predprob <- predict(mod3,type=c("response"))
+roccurve <- roc(sleep_trouble ~ predprob, data = pri_Q)
+plot(roccurve,col="red")
+auc(roccurve)
+```
+## Accuracy
+```{r}
+final_model_pri <- mod3
+predprob <- predict(final_model_pri,type=c("response"))
+predicted <- ifelse(predprob > 0.5, 1, 0)
+predicted <- factor(predicted, levels = c(0, 1))
+actual <- pri_Q$sleep_trouble
+actual <- factor(actual, levels = c(0, 1))
+confusionMatrix(predicted, actual)$overall["Accuracy"]
+```
+
+## Sensitivity analysis
+```{r}
+high_influence <-  as.numeric(rownames(influencePlot(mod3,col="red")))
+sen_dat_pri <- pri_Q[-high_influence, ]
+mod_sen <- update(mod3, data = sen_dat_pri)
+summary(mod_sen)$aic
+summary(final_model_pri)$aic
+```
+
+
+
+
+
+
+# Secondary Question
+
+## Secondary Question 1
+
+### categorical depression_score vs continuous depression_score
+```{r}
+cate <- glm(sleep_trouble ~ as.factor(depression_category), data = sec_Q1, family = "binomial")
+conti <- glm(sleep_trouble ~ depression_score, data = sec_Q1, family = "binomial")
+summary(cate)
+summary(conti)
+anova(cate, conti, test="Chisq")
+sec_Q1 <- sec_Q1 |>
+  select(-depression_category)
+```
+
+### VIF
+```{r}
+full_model <- glm(sleep_trouble ~ BMI+alcohol+gender+race_ethnicity+age+income+depression_score+total_cholesterol+avg_MAP,data = sec_Q1, family = "binomial")
+vif(full_model)
+```
+
+### Check the assumption that the relationship between a categorical covariate and an outcome changes linearly from one category to the next
+```{r}
+plot(conti$fitted.values~sec_Q1$depression_score,type='p',
+     col='black',ylab="P(sleep~disorder)",xlab="age")
+lines(cate$fitted.values~sec_Q1$depression_score,type='p',
+      col="red")
+legend('bottomright',legend=c("linear","ordinal"),
+       pch=c(1,1),col=c(1,2))
+
+```
+
+### potential confounders
+
+BMI, alcohol, gender, race_ethnicity, age, and income appear to satisfy the causal definition of a confounder
+
+```{r}
+mod2 <- glm(sleep_trouble ~ BMI+alcohol+gender+race_ethnicity+age+income+depression_score+avg_MAP,data = sec_Q1, family = "binomial")
+summary(mod2)
+```
+
+### potential effect modifier
+
+```{r}
+mod3 <- update(mod2,. ~ .+depression_score*BMI)
+coef(summary(mod3))["BMI:depression_score", "Pr(>|z|)"]
+mod3 <- update(mod2,. ~ .+depression_score*alcohol)
+coef(summary(mod3))["alcohol:depression_score", "Pr(>|z|)"]
+mod3 <- update(mod2,. ~ .+depression_score*gender)
+coef(summary(mod3))["gender2:depression_score", "Pr(>|z|)"]
+mod3 <- update(mod2,. ~ .+depression_score*race_ethnicity)
+summary(mod3)
+mod3 <- update(mod2,. ~ .+depression_score*age)
+coef(summary(mod3))["age:depression_score", "Pr(>|z|)"]
+mod3 <- update(mod2,. ~ .+depression_score*income)
+summary(mod3)
+```
+
+### Assess possible nonlinear effect of BMI, alcohol, income, and age
+
+```{r}
+mod3 <- update(mod2,. ~ .+ I(BMI^2))
+coef(summary(mod3))["I(BMI^2)", "Pr(>|z|)"]
+mod3 <- update(mod2,. ~ .+ I(alcohol^2))
+coef(summary(mod3))["I(alcohol^2)", "Pr(>|z|)"]
+mod3 <- update(mod2,. ~ .+ I(age^2))
+coef(summary(mod3))["I(age^2)", "Pr(>|z|)"]
+mod4 <- update(mod3,. ~ .+ I(alcohol^2))
+coef(summary(mod4))["I(alcohol^2)", "Pr(>|z|)"]
+mod4 <- update(mod3,. ~ .+ I(income^2))
+coef(summary(mod4))["I(income^2)", "Pr(>|z|)"]
+summary(mod3)
+```
+
+### check high influence points
+```{r}
+par(mfrow=c(1,1))
+influencePlot(mod3,col="red")
+influenceIndexPlot(mod3)
+```
+
+### GOF
+
+Hosmer-Lemeshow test because we have a larger number of covariate patterns.
+
+```{r}
+library(ResourceSelection)
+options(digits=7)
+# Hosmer-Lemeshow Test
+hoslem.test(mod3$y,fitted(mod3),g=10)
+```
+
+
+### ROC
+
+```{r}
+library(pROC)
+final_model_sec1 <- mod3
+predprob <- predict(mod3,type=c("response"))
+roccurve <- roc(sleep_trouble ~ predprob, data = sec_Q1)
+plot(roccurve,col="red")
+auc(roccurve)
+```
+
+
+## Secondary Question 2
+
+### Association Analysis for Sleep Hours
+
+```{r}
+library(glmnet)
+
+## Electrolytes
+
+# Sleep hours and phosphorous 
+lm_phs = lm(sleep_hours_avg ~ LBDSPHSI, data = sec_Q2)
+summary(lm_phs) #significant
+
+# Sleep hours and sodium
+lm_sod = lm(sleep_hours_avg ~ LBXSNASI, data = sec_Q2)
+summary(lm_sod)
+
+# Sleep hours and potassium
+lm_k = lm(sleep_hours_avg ~ LBXSKSI, data = sec_Q2)
+summary(lm_k)
+
+# Sleep hours and chloride
+lm_cl = lm(sleep_hours_avg ~ LBXSCLSI, data = sec_Q2)
+summary(lm_cl)
+
+# Sleep hours and calcium
+lm_ca = lm(sleep_hours_avg ~ LBDSCASI, data = sec_Q2)
+summary(lm_ca)
+
+# Sleep hours and iodine
+lm_iod = lm(sleep_hours_avg ~ URXUIO, data = sec_Q2)
+summary(lm_iod)
+
+# Sleep hours and iron
+lm_fe = lm(sleep_hours_avg ~ LBDSIRSI, data = sec_Q2)
+summary(lm_fe)
+
+
+## Common Biochemicals
+
+# Sleep hours and insulin
+lm_ins = lm(sleep_hours_avg ~ LBDINSI, data = sec_Q2)
+summary(lm_ins)
+
+# Uric Acid
+lm_ura = lm(sleep_hours_avg ~ LBXSUA, data = sec_Q2)
+summary(lm_ura) #highly significant
+
+# Blood glucose
+lm_glu = lm(sleep_hours_avg ~ LBDSGLSI, data = sec_Q2)
+summary(lm_glu) #significant
+
+# Nitrate
+lm_nit = lm(sleep_hours_avg ~ URXNO3, data = sec_Q2)
+summary(lm_nit)
+
+# Total cholesterol
+lm_tch = lm(sleep_hours_avg ~ LBDTCSI, data = sec_Q2)
+summary(lm_tch)
+
+## Main covariates from primary analysis
+
+#depression
+lm_dpscore = lm(sleep_hours_avg ~ dp_score, data = sec_Q2)
+summary(lm_dpscore)
+
+lm_dpcat = lm(sleep_hours_avg ~ dp_cate, data = sec_Q2)
+summary(lm_dpcat)
+
+
+## Stepwise Model Selection
+
+filtered_dat <- sec_Q2 %>% 
+  filter(!is.na(sleep_hours_avg) & 
+           !is.na(LBDSPHSI) & !is.na(LBXSNASI) & !is.na(LBXSKSI) & 
+           !is.na(LBXSCLSI) & !is.na(LBDSCASI) & !is.na(URXUIO) & 
+           !is.na(LBDSIRSI) & !is.na(LBDINSI) & !is.na(LBXSUA) & 
+           !is.na(LBDSGLSI) & !is.na(URXNO3) & !is.na(LBDTCSI) & 
+           !is.na(dp_score) & !is.na(dp_cate))
+
+
+lm_step <- lm(sleep_hours_avg ~ LBDSPHSI + LBXSNASI + LBXSKSI + LBXSCLSI + LBDSCASI +
+                URXUIO + LBDSIRSI + LBDINSI + LBXSUA + LBDSGLSI + URXNO3 + LBDTCSI +
+                dp_score + dp_cate, data=filtered_dat)
+summary(lm_step)
+stepModel <- step(lm_step, direction=c("both"))
+summary(stepModel)
+plot(fitted(stepModel), residuals(stepModel))
+abline(a=0,b=0,col="pink")
+
+qqnorm(residuals(stepModel)) 
+qqline(residuals(stepModel),col="pink")
+
+# Elastic Net
+x <- as.matrix(sec_Q2[, c("LBDSPHSI", "LBXSNASI", "LBXSKSI", "LBXSCLSI", 
+                            "LBDSCASI", "LBDSIRSI", 
+                            "LBXSUA", "LBDSGLSI", "LBDTCSI", 
+                            "dp_score", "dp_cate", 'BMI', 'gender','race_ethnicity','income', 'age')])
+
+y <- sec_Q2$sleep_hours_avg
+
+lambda_grid <- 10^seq(3, -3, length = 100)
+
+EN_model <- glmnet(x, y, alpha = 0.5, lambda = lambda_grid)
+
+set.seed(123) 
+cv.EN <- cv.glmnet(x, y, alpha = 0.5, lambda = lambda_grid)
+
+lambda_min_EN <- cv.EN$lambda.min  
+lambda_1se_EN <- cv.EN$lambda.1se  
+
+print(paste("Best lambda (min):", lambda_min_EN))
+print(paste("Best lambda (1se):", lambda_1se_EN))
+
+plot(cv.EN)
+
+final_model <- glmnet(x, y, alpha = 0.5, lambda = lambda_min_EN)
+
+coef(final_model)
+
+fitted_values <- predict(final_model, newx = x, s = lambda_min_EN)
+fitted_values <- as.vector(fitted_values)
+residuals_values <- y - fitted_values
+
+plot(fitted_values, residuals_values, 
+     xlab = "Fitted Values", ylab = "Residuals", 
+     main = "Residual Plot")
+abline(h = 0, col = "pink")
+
+qqnorm(residuals_values, main = "Q-Q Plot of Residuals")
+qqline(residuals_values, col = "blue")
+
+```
+
+### Association Analysis for Sleep Disorder
+
+```{r}
+
+## Electrolytes
+
+# Sleep disorders and phosphorous 
+logis_phs = glm(sleep_trouble ~ LBDSPHSI, data = sec_Q2, family = "binomial")
+summary(logis_phs) 
+
+# Sleep disorders and sodium
+logis_sod = glm(sleep_trouble ~ LBXSNASI, data = sec_Q2, family = "binomial")
+summary(logis_sod) 
+
+
+# Sleep disorders and potassium
+logis_k = glm(sleep_trouble ~ LBXSKSI, data = sec_Q2, family = "binomial")
+summary(logis_k) 
+
+
+# Sleep hours and chloride
+logis_cl = glm(sleep_trouble ~ LBXSCLSI, data = sec_Q2, family = "binomial")
+summary(logis_cl)  #highly significant
+
+
+# Sleep disorders and calcium
+logis_ca = glm(sleep_trouble ~ LBDSCASI, data = sec_Q2, family = "binomial")
+summary(logis_ca) 
+
+# Sleep disorders and iodine
+logis_iod = glm(sleep_trouble ~ URXUIO, data = sec_Q2, family = "binomial")
+summary(logis_iod) 
+
+
+# Sleep hours and iron
+logis_fe = glm(sleep_trouble ~ LBDSIRSI, data = sec_Q2, family = "binomial")
+summary(logis_fe) 
+
+
+## Common Biochemicals
+
+# Insulin
+logis_ins = glm(sleep_trouble ~ LBDINSI, data = sec_Q2, family = "binomial")
+summary(logis_ins) #highly significant
+
+# Uric Acid
+logis_ura = glm(sleep_trouble ~ LBXSUA, data = sec_Q2, family = "binomial")
+summary(logis_ura) 
+
+# Blood glucose
+logis_glu = glm(sleep_trouble ~ LBDSGLSI, data = sec_Q2, family = "binomial")
+summary(logis_glu) #highly significant
+
+# Nitrate
+logis_nit = glm(sleep_trouble ~ URXNO3, data = sec_Q2, family = "binomial")
+summary(logis_nit)
+
+# Total cholesterol
+logis_tch = glm(sleep_trouble ~ LBDTCSI, data = sec_Q2, family = "binomial")
+summary(logis_tch) #highly significant
+```
+
+## Secondary Question 3
+
+
+### predict 15-16 by full model
+```{r}
+full_model <- glm(sleep_trouble ~.,data = pri_Q, family = "binomial")
+predprob <- predict(object = full_model, newdata = sec_Q3, type = "response")
+predicted <- ifelse(predprob > 0.5, 1, 0)
+predicted <- factor(predicted, levels = c(0, 1))
+actual <- sec_Q3$sleep_trouble
+actual <- factor(actual, levels = c(0, 1))
+confusionMatrix(predicted, actual)$overall["Accuracy"]
+```
+
+### predict 13-14 by 20 model
+```{r}
+predprob <- predict(object = final_model_pri, newdata = sec_Q3, type = "response")
+predicted <- ifelse(predprob > 0.5, 1, 0)
+predicted <- factor(predicted, levels = c(0, 1))
+actual <- sec_Q3$sleep_trouble
+actual <- factor(actual, levels = c(0, 1))
+confusionMatrix(predicted, actual)$overall["Accuracy"]
+```
+
+### predict 13-14 by RF
+```{r}
+x <- as.matrix(pri_Q[, -1])
+x <- matrix(as.numeric(x), nrow = nrow(x), ncol = ncol(x))
+y <- factor(pri_Q$sleep_trouble)
+x_test <- as.matrix(sec_Q3[, c(-1,-11)])
+x_test <- matrix(as.numeric(x_test), nrow = nrow(x_test), ncol = ncol(x_test))
+y_test <- factor(sec_Q3$sleep_trouble)
+colnames(x) <- 1:ncol(as.matrix(pri_Q[, -1]))
+colnames(x_test) <- colnames(x)
+```
+
+#### Setup parallel
+
+```{r}
+nc <- detectCores() - 1
+cl <- makeCluster(nc)
+registerDoParallel(cl)
+```
+
+#### Random Forest
+
+```{r}
+trees <- 300
+train_rf <- train(x, y, method = "rf", 
+                  preProcess = "nzv",
+                  tuneGrid = data.frame(mtry = seq(5, 15)),
+                  ntree = trees
+                  )
+y_hat_rf <- predict(train_rf, x_test, type = "raw")
+confusionMatrix(y_hat_rf, y_test)$overall["Accuracy"]
+stopCluster(cl)
+stopImplicitCluster()
+```
+
+# Imputation dataset 
+
+## 2020
+```{r}
+vis_miss(dat_raw_2020)
+```
+
+```{r}
+missing_ind <- dat_raw_2020 %>%
+  mutate(across(everything(), ~ ifelse(is.na(.), 1, 0), .names = "miss_{col}"))
+
+summary(glm(miss_sleep_trouble ~ BMI, data = missing_ind, family = binomial))
+```
+
+```{r}
+dat_subset_missing_indicators <- dat_subset %>%
+  mutate(miss_sleep_trouble = ifelse(is.na(sleep_trouble), 1, 0))
+
+covariate_names <- setdiff(names(dat_subset_missing_indicators), c("sleep_time_weekdays", "miss_sleep_time_weekdays", "ID", "sleep_hours_weekdays", "miss_sleep_hours_weekdays", "wake_time_weekdays","miss_wake_time_weekdays", "sleep_time_weekends","miss_sleep_time_weekends" ,"wake_time_weekends","miss_wake_time_weekends", "depression_category" ,"sleep_hours_weekends", "miss_sleep_hours_weekends" , "frq_snort_or_stop_breathing" , "miss_frq_snort_or_stop_breathing"))
+
+results_list <- list()
+
+for (covariate in covariate_names) {
+  # Define the formula
+  formula <- as.formula(paste("miss_sleep_trouble ~", covariate))
+  
+  # Fit the model and handle warnings and errors
+  tryCatch({
+    model <- glm(formula, data = dat_subset_missing_indicators, family = binomial, control = glm.control(maxit = 50))
+    if (!model$converged) {
+      warning(paste("Model did not converge for covariate:", covariate))
+    } else {
+      summary_model <- summary(model)
+      p_value <- summary_model$coefficients[2, 4]
+      
+      # Store the results
+      results_list[[covariate]] <- list(
+        estimate = summary_model$coefficients[2, 1],
+        std_error = summary_model$coefficients[2, 2],
+        z_value = summary_model$coefficients[2, 3],
+        p_value = p_value
+      )
+    }
+  }, error = function(e) {
+    message(paste("Model failed for covariate:", covariate, "with error:", e$message))
+  }, warning = function(w) {
+    message(paste("Warning for covariate:", covariate, "-", w$message))
+  })
+}
+
+if (length(results_list) > 0) {
+  results_df <- do.call(rbind, lapply(names(results_list), function(name) {
+    c(covariate = name, results_list[[name]])
+  }))
+  
+  print(results_df)
+} else {
+  message("No models converged successfully.")
+}
+
+```
+
+```{r}
+results_df <- as.data.frame(results_df)
+
+results_df$estimate <- as.numeric(results_df$estimate)
+results_df$p_value <- as.numeric(results_df$p_value)
+
+ggplot(results_df, aes(x = estimate, y = -log10(p_value), label = covariate)) +
+  geom_point(aes(color = p_value < 0.05), size = 3) +  
+  geom_text_repel(
+    aes(label = covariate, color = p_value < 0.05),  
+    size = 3
+  ) +
+  scale_color_manual(
+    values = c("TRUE" = "red", "FALSE" = "blue"),    
+    labels = c("FALSE" = "Not Significant", "TRUE" = "Significant")
+  ) +
+  labs(
+    x = "Coefficient Estimate",
+    y = "-log10(p-value)",
+    title = "Logistic Regression Results for Missingness of sleep_trouble",
+    color = "Significance (p < 0.05)"
+  ) +
+  theme_minimal() +
+  coord_cartesian(xlim = c(-2, 2))
+```
+
+```{r}
+all_covariates_formula <- as.formula(paste("miss_sleep_trouble ~", paste(covariate_names, collapse = " + ")))
+multivariable_model <- glm(all_covariates_formula, data = dat_subset_missing_indicators, family = binomial)
+summary(multivariable_model)
+```
+
+```{r}
+
+imputed_data <- mice(
+  dat_raw_2020,
+  m = 5,              
+  maxit = 10,          
+  method = 'pmm',      
+  delta = 0            
+)
+completed_data <- complete(imputed_data, action = 1)
+write.csv(completed_data, file = "./data/Imputed_Dataset_2017_20.csv", row.names = FALSE)
+
+```
+
+```{r}
+vis_miss(dat_raw_13)
+vis_miss(dat_raw_15)
+```
+
+
