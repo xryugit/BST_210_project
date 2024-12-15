@@ -342,6 +342,9 @@ dat_clean <- dat_raw_13 |>
 
 sec_Q1 <- dat_clean[,c("sleep_trouble","BMI","alcohol","gender","race_ethnicity","age","income","depression_score","depression_category","avg_MAP","total_cholesterol")]
 sec_Q1$sleep_trouble <- ifelse(dat_clean$sleep_trouble == "2",0,1)
+
+sec_Q3_2 <- dat_clean[,c("sleep_diagnosed","BMI","alcohol","gender","race_ethnicity","age","income","depression_score","depression_category","avg_MAP","total_cholesterol")]
+sec_Q3_2$sleep_diagnosed <- ifelse(dat_clean$sleep_diagnosed == "2",0,1)
 ```
 
 ## 15-16
@@ -463,7 +466,7 @@ full_model <- glm(sleep_trouble ~ BMI+alcohol+gender+race_ethnicity+age+income+d
 vif(full_model)
 ```
 
-## Check the assumption that the relationship between a categorical covariate and an outcome changes linearly from one category to the next
+## !Check the assumption that the relationship between a categorical covariate and an outcome changes linearly from one category to the next !assumptions
 ```{r}
 plot(conti$fitted.values~pri_Q$depression_score,type='p',
      col='black',ylab="P(sleep~disorder)",xlab="age")
@@ -519,6 +522,8 @@ coef(summary(mod4))["I(avg_MAP^2)", "Pr(>|z|)"]
 mod4 <- update(mod3,. ~ .+I(total_cholesterol^2))
 coef(summary(mod4))["I(total_cholesterol^2)", "Pr(>|z|)"]
 ```
+```{r}
+```
 
 $$
 \log\left(\frac{p_{sleep~disorder}}{1-p_{sleep~disorder}}\right) = \beta_{k,0} + \beta_{k,1} depression_{i} + \beta_{k,2} BMI _{i} + \beta_{k,3} alcohol_{i} + \beta_{k,4} Race_{i} + \beta_{k,5} age_{i} + \beta_{k,6} age^2_{i}+ \beta_{k,7} income_{i} + \beta_{k,8} \text{avg_MAP}_{i} + \beta_{k,9} \text{total_cholesterol}_{i}
@@ -560,14 +565,7 @@ actual <- factor(actual, levels = c(0, 1))
 confusionMatrix(predicted, actual)$overall["Accuracy"]
 ```
 
-## Sensitivity analysis
-```{r}
-high_influence <-  as.numeric(rownames(influencePlot(mod3,col="red")))
-sen_dat_pri <- pri_Q[-high_influence, ]
-mod_sen <- update(mod3, data = sen_dat_pri)
-summary(mod_sen)$aic
-summary(final_model_pri)$aic
-```
+
 
 
 
@@ -813,83 +811,9 @@ qqline(residuals_values, col = "blue")
 
 ```
 
-### Association Analysis for Sleep Disorder
-
-```{r}
-
-## Electrolytes
-
-# Sleep disorders and phosphorous 
-logis_phs = glm(sleep_trouble ~ LBDSPHSI, data = sec_Q2, family = "binomial")
-summary(logis_phs) 
-
-# Sleep disorders and sodium
-logis_sod = glm(sleep_trouble ~ LBXSNASI, data = sec_Q2, family = "binomial")
-summary(logis_sod) 
-
-
-# Sleep disorders and potassium
-logis_k = glm(sleep_trouble ~ LBXSKSI, data = sec_Q2, family = "binomial")
-summary(logis_k) 
-
-
-# Sleep hours and chloride
-logis_cl = glm(sleep_trouble ~ LBXSCLSI, data = sec_Q2, family = "binomial")
-summary(logis_cl)  #highly significant
-
-
-# Sleep disorders and calcium
-logis_ca = glm(sleep_trouble ~ LBDSCASI, data = sec_Q2, family = "binomial")
-summary(logis_ca) 
-
-# Sleep disorders and iodine
-logis_iod = glm(sleep_trouble ~ URXUIO, data = sec_Q2, family = "binomial")
-summary(logis_iod) 
-
-
-# Sleep hours and iron
-logis_fe = glm(sleep_trouble ~ LBDSIRSI, data = sec_Q2, family = "binomial")
-summary(logis_fe) 
-
-
-## Common Biochemicals
-
-# Insulin
-logis_ins = glm(sleep_trouble ~ LBDINSI, data = sec_Q2, family = "binomial")
-summary(logis_ins) #highly significant
-
-# Uric Acid
-logis_ura = glm(sleep_trouble ~ LBXSUA, data = sec_Q2, family = "binomial")
-summary(logis_ura) 
-
-# Blood glucose
-logis_glu = glm(sleep_trouble ~ LBDSGLSI, data = sec_Q2, family = "binomial")
-summary(logis_glu) #highly significant
-
-# Nitrate
-logis_nit = glm(sleep_trouble ~ URXNO3, data = sec_Q2, family = "binomial")
-summary(logis_nit)
-
-# Total cholesterol
-logis_tch = glm(sleep_trouble ~ LBDTCSI, data = sec_Q2, family = "binomial")
-summary(logis_tch) #highly significant
-```
-
 ## Secondary Question 3
 
-
-### predict 15-16 by full model
-```{r}
-full_model <- glm(sleep_trouble ~.,data = pri_Q, family = "binomial")
-predprob <- predict(object = full_model, newdata = sec_Q3, type = "response")
-predicted <- ifelse(predprob > 0.5, 1, 0)
-predicted <- factor(predicted, levels = c(0, 1))
-actual <- sec_Q3$sleep_trouble
-actual <- factor(actual, levels = c(0, 1))
-confusionMatrix(predicted, actual)$overall["Accuracy"]
-```
-
-### predict 13-14 by 20 model
+### predict 15-16 by primary-Q model
 ```{r}
 predprob <- predict(object = final_model_pri, newdata = sec_Q3, type = "response")
 predicted <- ifelse(predprob > 0.5, 1, 0)
@@ -899,7 +823,13 @@ actual <- factor(actual, levels = c(0, 1))
 confusionMatrix(predicted, actual)$overall["Accuracy"]
 ```
 
-### predict 13-14 by RF
+```{r}
+roccurve <- roc(sleep_trouble ~ predprob, data = sec_Q3)
+plot(roccurve,col="red")
+auc(roccurve)
+```
+
+### predict 15-16 by RF
 ```{r}
 x <- as.matrix(pri_Q[, -1])
 x <- matrix(as.numeric(x), nrow = nrow(x), ncol = ncol(x))
@@ -933,6 +863,96 @@ confusionMatrix(y_hat_rf, y_test)$overall["Accuracy"]
 stopCluster(cl)
 stopImplicitCluster()
 ```
+```{r}
+y_hat_rf_prob <- predict(train_rf, x_test, type = "prob")[, 2]
+roccurve <- roc(y_test ~ y_hat_rf_prob)
+plot(roccurve,col="red")
+auc(roccurve)
+```
+
+
+### predict 13-14 by primary-Q model
+```{r}
+predprob <- predict(object = final_model_pri, newdata = sec_Q3_2 , type = "response")
+predicted <- ifelse(predprob > 0.5, 1, 0)
+predicted <- factor(predicted, levels = c(0, 1))
+actual <- sec_Q3_2$sleep_diagnosed
+actual <- factor(actual, levels = c(0, 1))
+confusionMatrix(predicted, actual)$overall["Accuracy"]
+```
+
+```{r}
+roccurve <- roc(sleep_diagnosed ~ predprob, data = sec_Q3_2 )
+plot(roccurve,col="red")
+auc(roccurve)
+```
+
+### predict 13-14 by RF
+```{r}
+x <- as.matrix(pri_Q[, -1])
+x <- matrix(as.numeric(x), nrow = nrow(x), ncol = ncol(x))
+y <- factor(pri_Q$sleep_trouble)
+x_test <- as.matrix(sec_Q3_2[, c(-1,-9)])
+x_test <- matrix(as.numeric(x_test), nrow = nrow(x_test), ncol = ncol(x_test))
+y_test <- factor(sec_Q3_2$sleep_diagnosed)
+colnames(x) <- 1:ncol(as.matrix(pri_Q[, -1]))
+colnames(x_test) <- colnames(x)
+```
+
+#### Setup parallel
+
+```{r}
+nc <- detectCores() - 1
+cl <- makeCluster(nc)
+registerDoParallel(cl)
+```
+
+#### Random Forest
+
+```{r}
+trees <- 300
+train_rf <- train(x, y, method = "rf", 
+                  preProcess = "nzv",
+                  tuneGrid = data.frame(mtry = seq(5, 15)),
+                  ntree = trees
+                  )
+y_hat_rf <- predict(train_rf, x_test, type = "raw")
+confusionMatrix(y_hat_rf, y_test)$overall["Accuracy"]
+stopCluster(cl)
+stopImplicitCluster()
+```
+```{r}
+y_hat_rf_prob <- predict(train_rf, x_test, type = "prob")[, 2]
+roccurve <- roc(y_test ~ y_hat_rf_prob)
+plot(roccurve,col="red")
+auc(roccurve)
+```
+# Sensitivity analysis
+```{r}
+high_influence <-  as.numeric(rownames(influencePlot(final_model_pri,col="red")))
+pri_Q[high_influence, ]
+summary(pri_Q)
+
+```
+#### Try Remove
+```{r}
+sen_dat_pri <- pri_Q[-high_influence, ]
+mod_sen <- update(final_model_pri, data = sen_dat_pri)
+summary(mod_sen)$aic
+summary(final_model_pri)$aic
+```
+
+
+
+```{r}
+high_influence <-  as.numeric(rownames(influencePlot(final_model_sec1,col="red")))
+sen_dat_pri <- pri_Q[-high_influence, ]
+mod_sen <- update(final_model_sec1, data = sen_dat_pri)
+summary(mod_sen)$aic
+summary(final_model_sec1)$aic
+```
+
+
 
 # Imputation dataset 
 
@@ -1029,7 +1049,6 @@ summary(multivariable_model)
 ```
 
 ```{r}
-
 imputed_data <- mice(
   dat_raw_2020,
   m = 5,              
@@ -1047,4 +1066,18 @@ vis_miss(dat_raw_13)
 vis_miss(dat_raw_15)
 ```
 
+
+
+
+# Extra analysis
+
+## Compare the percent of coefficient change between 2020 and 2013 model
+
+```{r}
+(final_model_sec1$coefficients - final_model_pri$coefficients) /final_model_pri$coefficients
+```
+```{r}
+final_model_sec1$coefficients
+final_model_pri$coefficients
+```
 
