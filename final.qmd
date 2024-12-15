@@ -1524,7 +1524,6 @@ completed_data_2020 <- complete(imputed_data, action = 1)
 
 
 ```{r}
-completed_data_2020 <- completed_data_20201
 colnames(completed_data_2020) <- new_colnames
 completed_data_2020[completed_data_2020 == ""] <- NA
 completed_data_2020 <- completed_data_2020[,c("sleep_trouble","BMI","avg_MAP","total_cholesterol","alcohol","gender","race_ethnicity","age","income","depression_score","depression_category")]
@@ -1535,23 +1534,9 @@ completed_data_2020 <- completed_data_2020 |>
   mutate(across(c(,),as.numeric))
 
 completed_data_2020$sleep_trouble <- ifelse(completed_data_2020$sleep_trouble == "2",0,1)
-# remove all lines with NA
-
-completed_data_2020$sleep_trouble <- ifelse(completed_data_2020$sleep_trouble == "2",0,1)
 imputated_model <- update(final_model_pri, data = completed_data_2020)
 summary(imputated_model)
 summary(final_model_pri)
 ```
 
-# Extra analysis
-
-## Compare the percent of coefficient change between 2020 and 2013 model
-
-```{r}
-(final_model_sec1$coefficients - final_model_pri$coefficients) /final_model_pri$coefficients
-```
-```{r}
-final_model_sec1$coefficients
-final_model_pri$coefficients
-```
 
