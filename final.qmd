@@ -918,12 +918,9 @@ mod4 <- update(mod3,. ~ .+I(total_cholesterol^2))
 coef(summary(mod4))["I(total_cholesterol^2)", "Pr(>|z|)"]
 ```
 
-
-
 $$
 \log\left(\frac{p_{sleep~disorder}}{1-p_{sleep~disorder}}\right) = \beta_{0} + \beta_{1} depression_{i} + \beta_{2} BMI _{i} + \beta_{3} alcohol_{i} + \beta_{4} ethnicity_{i} + \beta_{5} age_{i} + \beta_{6} age^2_{i}+ \beta_{7} income_{i} + \beta_{8} \text{avg_MAP}_{i}
-$$
-## check high influence points
+$$ \## check high influence points
 
 ```{r}
 par(mfrow=c(1,1))
@@ -1165,10 +1162,10 @@ qqnorm(residuals(stepModel))
 qqline(residuals(stepModel),col="pink")
 
 # Elastic Net
-x <- as.matrix(sec_Q2[, c("LBDSPHSI", "LBXSNASI", "LBXSKSI", "LBXSCLSI", 
-                            "LBDSCASI", "LBDSIRSI", 
-                            "LBXSUA", "LBDSGLSI", "LBDTCSI", 
-                            "dp_score", "dp_cate", 'BMI', 'gender','race_ethnicity','income', 'age')])
+x <- model.matrix(~ LBDSPHSI + LBXSNASI + LBXSKSI + LBXSCLSI + 
+                    LBDSCASI + LBDSIRSI + LBXSUA + LBDSGLSI + 
+                    LBDTCSI + dp_score + BMI + gender + 
+                    race_ethnicity + income + age, data = sec_Q2)[,-1]
 
 y <- sec_Q2$sleep_hours_avg
 
@@ -1202,7 +1199,6 @@ abline(h = 0, col = "pink")
 
 qqnorm(residuals_values, main = "Q-Q Plot of Residuals")
 qqline(residuals_values, col = "blue")
-
 ```
 
 ## Secondary Question 3
