@@ -4,8 +4,8 @@ format: pdf
 editor: visual
 ---
 
-
 # Library
+
 ```{r}
 library(tidyverse) 
 library(haven)      
@@ -28,6 +28,7 @@ library(naniar)
 ## 2020
 
 ### Primary Question
+
 ```{r}
 getwd()
 setwd("./data/2020")
@@ -240,10 +241,10 @@ sec_Q2 <- Reduce(function(x, y) left_join(x, y, by = "ID"), extra_data_list) #!c
 
 ```
 
-
 ## 13_14
 
 ### Secondary Question 1
+
 ```{r}
 getwd()
 setwd("./data/13_14")
@@ -348,6 +349,7 @@ sec_Q3_2$sleep_diagnosed <- ifelse(dat_13$sleep_diagnosed == "2",0,1)
 ```
 
 ## 15-16
+
 ```{r}
 getwd()
 setwd("./data/15_16")
@@ -431,6 +433,7 @@ sec_Q3$sleep_trouble <- ifelse(dat_1516$sleep_trouble == "2",0,1)
 # EDA
 
 ## 2020
+
 ```{r}
 summary(dat_2020)
 numeric_vars <- select(dat_2020, age, BMI, avg_MAP, income, 
@@ -624,7 +627,6 @@ ggplot(dat_2020, aes(x = frq_snore, y = sleep_hours_weekdays)) +
   ) +
   theme_minimal()
 ```
-
 
 ## 13_14
 
@@ -831,13 +833,12 @@ ggplot(dat_13, aes(x = sleep_diagnosed, y = sleep_hours)) +
   theme_minimal()
 ```
 
-
 # Primary Question
 
 ## categorical depression_score vs continuous depression_score
 
 $$
-\log\left(\frac{p_{sleep~disorder}}{1-p_{sleep~disorder}}\right) = \beta_{k,0} + \beta_{k,1} depression_{i}
+\log\left(\frac{p_{sleep~disorder}}{1-p_{sleep~disorder}}\right) = \beta_{0} + \beta_{1} depression_{i}
 $$
 
 ```{r}
@@ -851,12 +852,14 @@ pri_Q <- pri_Q |>
 ```
 
 ## VIF
+
 ```{r}
 full_model <- glm(sleep_trouble ~ BMI+alcohol+gender+race_ethnicity+age+income+depression_score+avg_MAP+total_cholesterol,data = pri_Q, family = "binomial")
 vif(full_model)
 ```
 
 ## Check the assumption that the relationship between a categorical covariate and an outcome changes linearly from one category to the next !assumptions
+
 ```{r}
 plot(conti$fitted.values~pri_Q$depression_score,type='p',
      col='black',ylab="P(sleep~disorder)",xlab="age")
@@ -876,6 +879,7 @@ summary(mod2)
 ```
 
 ## potential effect modifier
+
 ```{r}
 mod3 <- update(mod2,. ~ .+depression_score*BMI)
 coef(summary(mod3))["BMI:depression_score", "Pr(>|z|)"]
@@ -896,6 +900,7 @@ coef(summary(mod3))["depression_score:total_cholesterol", "Pr(>|z|)"]
 ```
 
 ## Assess possible nonlinear effect of BMI, alcohol, income, and age
+
 ```{r}
 mod3 <- update(mod2,. ~ .+ I(BMI^2))
 coef(summary(mod3))["I(BMI^2)", "Pr(>|z|)"]
@@ -912,13 +917,14 @@ coef(summary(mod4))["I(avg_MAP^2)", "Pr(>|z|)"]
 mod4 <- update(mod3,. ~ .+I(total_cholesterol^2))
 coef(summary(mod4))["I(total_cholesterol^2)", "Pr(>|z|)"]
 ```
-```{r}
-```
+
+
 
 $$
-\log\left(\frac{p_{sleep~disorder}}{1-p_{sleep~disorder}}\right) = \beta_{k,0} + \beta_{k,1} depression_{i} + \beta_{k,2} BMI _{i} + \beta_{k,3} alcohol_{i} + \beta_{k,4} Race_{i} + \beta_{k,5} age_{i} + \beta_{k,6} age^2_{i}+ \beta_{k,7} income_{i} + \beta_{k,8} \text{avg_MAP}_{i} + \beta_{k,9} \text{total_cholesterol}_{i}
+\log\left(\frac{p_{sleep~disorder}}{1-p_{sleep~disorder}}\right) = \beta_{0} + \beta_{1} depression_{i} + \beta_{2} BMI _{i} + \beta_{3} alcohol_{i} + \beta_{4} ethnicity_{i} + \beta_{5} age_{i} + \beta_{6} age^2_{i}+ \beta_{7} income_{i} + \beta_{8} \text{avg_MAP}_{i}
 $$
 ## check high influence points
+
 ```{r}
 par(mfrow=c(1,1))
 influencePlot(mod3,col="red")
@@ -937,6 +943,7 @@ hoslem.test(mod3$y,fitted(mod3),g=10)
 ```
 
 ## ROC
+
 ```{r}
 library(pROC)
 predprob <- predict(mod3,type=c("response"))
@@ -944,7 +951,9 @@ roccurve <- roc(sleep_trouble ~ predprob, data = pri_Q)
 plot(roccurve,col="red")
 auc(roccurve)
 ```
+
 ## Accuracy
+
 ```{r}
 final_model_pri <- mod3
 predprob <- predict(final_model_pri,type=c("response"))
@@ -955,18 +964,12 @@ actual <- factor(actual, levels = c(0, 1))
 confusionMatrix(predicted, actual)$overall["Accuracy"]
 ```
 
-
-
-
-
-
-
-
 # Secondary Question
 
 ## Secondary Question 1
 
 ### categorical depression_score vs continuous depression_score
+
 ```{r}
 cate <- glm(sleep_trouble ~ as.factor(depression_category), data = sec_Q1, family = "binomial")
 conti <- glm(sleep_trouble ~ depression_score, data = sec_Q1, family = "binomial")
@@ -978,12 +981,14 @@ sec_Q1 <- sec_Q1 |>
 ```
 
 ### VIF
+
 ```{r}
 full_model <- glm(sleep_trouble ~ BMI+alcohol+gender+race_ethnicity+age+income+depression_score+total_cholesterol+avg_MAP,data = sec_Q1, family = "binomial")
 vif(full_model)
 ```
 
 ### Check the assumption that the relationship between a categorical covariate and an outcome changes linearly from one category to the next
+
 ```{r}
 plot(conti$fitted.values~sec_Q1$depression_score,type='p',
      col='black',ylab="P(sleep~disorder)",xlab="age")
@@ -1037,6 +1042,7 @@ summary(mod3)
 ```
 
 ### check high influence points
+
 ```{r}
 par(mfrow=c(1,1))
 influencePlot(mod3,col="red")
@@ -1054,7 +1060,6 @@ options(digits=7)
 hoslem.test(mod3$y,fitted(mod3),g=10)
 ```
 
-
 ### ROC
 
 ```{r}
@@ -1065,7 +1070,6 @@ roccurve <- roc(sleep_trouble ~ predprob, data = sec_Q1)
 plot(roccurve,col="red")
 auc(roccurve)
 ```
-
 
 ## Secondary Question 2
 
@@ -1204,6 +1208,7 @@ qqline(residuals_values, col = "blue")
 ## Secondary Question 3
 
 ### predict 15-16 by primary-Q model
+
 ```{r}
 predprob <- predict(object = final_model_pri, newdata = sec_Q3, type = "response")
 predicted <- ifelse(predprob > 0.5, 1, 0)
@@ -1220,6 +1225,7 @@ auc(roccurve)
 ```
 
 ### predict 15-16 by RF
+
 ```{r}
 x <- as.matrix(pri_Q[, -1])
 x <- matrix(as.numeric(x), nrow = nrow(x), ncol = ncol(x))
@@ -1242,7 +1248,7 @@ registerDoParallel(cl)
 #### Random Forest
 
 ```{r}
-trees <- 300
+trees <- 30
 train_rf <- train(x, y, method = "rf", 
                   preProcess = "nzv",
                   tuneGrid = data.frame(mtry = seq(5, 15)),
@@ -1253,6 +1259,7 @@ confusionMatrix(y_hat_rf, y_test)$overall["Accuracy"]
 stopCluster(cl)
 stopImplicitCluster()
 ```
+
 ```{r}
 y_hat_rf_prob <- predict(train_rf, x_test, type = "prob")[, 2]
 roccurve <- roc(y_test ~ y_hat_rf_prob)
@@ -1260,8 +1267,8 @@ plot(roccurve,col="red")
 auc(roccurve)
 ```
 
-
 ### predict 13-14 by primary-Q model
+
 ```{r}
 predprob <- predict(object = final_model_pri, newdata = sec_Q3_2 , type = "response")
 predicted <- ifelse(predprob > 0.5, 1, 0)
@@ -1278,6 +1285,7 @@ auc(roccurve)
 ```
 
 ### predict 13-14 by RF
+
 ```{r}
 x <- as.matrix(pri_Q[, -1])
 x <- matrix(as.numeric(x), nrow = nrow(x), ncol = ncol(x))
@@ -1300,7 +1308,7 @@ registerDoParallel(cl)
 #### Random Forest
 
 ```{r}
-trees <- 300
+trees <- 30
 train_rf <- train(x, y, method = "rf", 
                   preProcess = "nzv",
                   tuneGrid = data.frame(mtry = seq(5, 15)),
@@ -1311,28 +1319,31 @@ confusionMatrix(y_hat_rf, y_test)$overall["Accuracy"]
 stopCluster(cl)
 stopImplicitCluster()
 ```
+
 ```{r}
 y_hat_rf_prob <- predict(train_rf, x_test, type = "prob")[, 2]
 roccurve <- roc(y_test ~ y_hat_rf_prob)
 plot(roccurve,col="red")
 auc(roccurve)
 ```
+
 # Sensitivity analysis
+
 ```{r}
 high_influence <-  as.numeric(rownames(influencePlot(final_model_pri,col="red")))
 pri_Q[high_influence, ]
 summary(pri_Q)
 
 ```
+
 #### Try Remove
+
 ```{r}
 sen_dat_pri <- pri_Q[-high_influence, ]
 mod_sen <- update(final_model_pri, data = sen_dat_pri)
 summary(mod_sen)$aic
 summary(final_model_pri)$aic
 ```
-
-
 
 ```{r}
 high_influence <-  as.numeric(rownames(influencePlot(final_model_sec1,col="red")))
@@ -1342,11 +1353,10 @@ summary(mod_sen)$aic
 summary(final_model_sec1)$aic
 ```
 
-
-
-# Imputation dataset 
+# Imputation dataset
 
 ## 2020
+
 ```{r}
 
 getwd()
@@ -1522,7 +1532,6 @@ completed_data_2020 <- complete(imputed_data, action = 1)
 
 ```
 
-
 ```{r}
 colnames(completed_data_2020) <- new_colnames
 completed_data_2020[completed_data_2020 == ""] <- NA
@@ -1538,5 +1547,3 @@ imputated_model <- update(final_model_pri, data = completed_data_2020)
 summary(imputated_model)
 summary(final_model_pri)
 ```
-
-
