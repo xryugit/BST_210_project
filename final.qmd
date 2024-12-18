@@ -2,6 +2,8 @@
 title: "final"
 format: pdf
 editor: visual
+execute:
+  eval: false
 ---
 
 # Library
@@ -837,10 +839,6 @@ ggplot(dat_13, aes(x = sleep_diagnosed, y = sleep_hours)) +
 
 ## categorical depression_score vs continuous depression_score
 
-$$
-\log\left(\frac{p_{sleep~disorder}}{1-p_{sleep~disorder}}\right) = \beta_{0} + \beta_{1} depression_{i}
-$$
-
 ```{r}
 cate <- glm(sleep_trouble ~ as.factor(depression_category), data = pri_Q, family = "binomial")
 conti <- glm(sleep_trouble ~ depression_score, data = pri_Q, family = "binomial")
@@ -918,9 +916,7 @@ mod4 <- update(mod3,. ~ .+I(total_cholesterol^2))
 coef(summary(mod4))["I(total_cholesterol^2)", "Pr(>|z|)"]
 ```
 
-$$
-\log\left(\frac{p_{sleep~disorder}}{1-p_{sleep~disorder}}\right) = \beta_{0} + \beta_{1} depression_{i} + \beta_{2} BMI _{i} + \beta_{3} alcohol_{i} + \beta_{4} ethnicity_{i} + \beta_{5} age_{i} + \beta_{6} age^2_{i}+ \beta_{7} income_{i} + \beta_{8} \text{avg_MAP}_{i}
-$$ \## check high influence points
+## check high influence points
 
 ```{r}
 par(mfrow=c(1,1))
@@ -1244,7 +1240,7 @@ registerDoParallel(cl)
 #### Random Forest
 
 ```{r}
-trees <- 30
+trees <- 300
 train_rf <- train(x, y, method = "rf", 
                   preProcess = "nzv",
                   tuneGrid = data.frame(mtry = seq(5, 15)),
@@ -1304,7 +1300,7 @@ registerDoParallel(cl)
 #### Random Forest
 
 ```{r}
-trees <- 30
+trees <- 300
 train_rf <- train(x, y, method = "rf", 
                   preProcess = "nzv",
                   tuneGrid = data.frame(mtry = seq(5, 15)),
